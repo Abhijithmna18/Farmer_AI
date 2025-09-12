@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* small overrides */
+/***** Base body colors with explicit html.dark *****/
+html.dark body {
+  @apply bg-slate-900 text-slate-100;
+}
+body {
+  @apply bg-slate-50 text-slate-800;
+}
+.container {
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+@keyframes toast-enter {
+  0% { 
+    transform: translateX(100px); 
+    opacity: 0; 
+  }
+  100% { 
+    transform: translateX(0); 
+    opacity: 1; 
+  }
+}
+
+.animate-toast-enter {
+  animation: toast-enter 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1.5s linear infinite;
+}
+
+.loading-dots span {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+/* Add to global CSS */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Ensure smooth animations */
+* {
+  transition: all 0.3s ease;
+}
+@keyframes button-hover {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+
+/* Dark mode text overrides for commonly used gray utilities */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: #e2e8f0; /* slate-200 */
+}
+.dark .text-gray-600,
+.dark .text-gray-500 {
+  color: #94a3b8; /* slate-400 */
+}

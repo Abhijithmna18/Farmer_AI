@@ -1,0 +1,454 @@
+{
+  "info": {
+    "name": "FarmerAI Growth Calendar API",
+    "description": "Comprehensive API collection for testing the enhanced Growth Calendar module with remaining days calculation, email notifications, and task management.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "calendar_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "stage_name",
+      "value": "Vegetative",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"abhijithmanir2002@gmail.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', response.token);",
+                  "    console.log('JWT Token saved:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Regular User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Growth Calendar CRUD",
+      "item": [
+        {
+          "name": "Create Growth Calendar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cropName\": \"Tomato\",\n  \"variety\": \"Cherry Tomato\",\n  \"plantingDate\": \"2024-01-15\",\n  \"sowingDate\": \"2024-01-15\",\n  \"transplantDate\": \"2024-02-01\",\n  \"harvestDate\": \"2024-04-15\",\n  \"expectedYield\": 50,\n  \"yieldUnit\": \"kg\",\n  \"location\": {\n    \"name\": \"Field A\",\n    \"coordinates\": {\n      \"latitude\": 12.9716,\n      \"longitude\": 77.5946\n    },\n    \"area\": 0.5,\n    \"soilType\": \"Loamy\"\n  },\n  \"stages\": [\n    {\n      \"stageName\": \"Seed\",\n      \"startDate\": \"2024-01-15\",\n      \"endDate\": \"2024-01-25\",\n      \"description\": \"Seed germination and initial growth\",\n      \"careNeeds\": \"Keep soil moist, maintain temperature 20-25°C\",\n      \"nutrientRequirements\": \"Light nitrogen application\",\n      \"expectedDuration\": 10,\n      \"temperature\": {\n        \"min\": 20,\n        \"max\": 25,\n        \"optimal\": 22\n      },\n      \"humidity\": {\n        \"min\": 60,\n        \"max\": 80,\n        \"optimal\": 70\n      },\n      \"lightRequirements\": \"Partial shade\",\n      \"tasks\": [\n        {\n          \"name\": \"Water seeds\",\n          \"description\": \"Light watering to keep soil moist\",\n          \"scheduledDate\": \"2024-01-16\",\n          \"priority\": \"high\",\n          \"frequency\": \"daily\"\n        }\n      ]\n    },\n    {\n      \"stageName\": \"Sprout\",\n      \"startDate\": \"2024-01-25\",\n      \"endDate\": \"2024-02-05\",\n      \"description\": \"First leaves appear\",\n      \"careNeeds\": \"Increase light exposure gradually\",\n      \"nutrientRequirements\": \"Balanced NPK fertilizer\",\n      \"expectedDuration\": 10,\n      \"tasks\": [\n        {\n          \"name\": \"Check for pests\",\n          \"description\": \"Inspect leaves for aphids and other pests\",\n          \"scheduledDate\": \"2024-01-28\",\n          \"priority\": \"medium\",\n          \"frequency\": \"weekly\"\n        }\n      ]\n    },\n    {\n      \"stageName\": \"Vegetative\",\n      \"startDate\": \"2024-02-05\",\n      \"endDate\": \"2024-03-15\",\n      \"description\": \"Rapid leaf and stem growth\",\n      \"careNeeds\": \"Regular watering and pruning\",\n      \"nutrientRequirements\": \"High nitrogen for vegetative growth\",\n      \"expectedDuration\": 40,\n      \"tasks\": [\n        {\n          \"name\": \"Prune suckers\",\n          \"description\": \"Remove side shoots to promote main stem growth\",\n          \"scheduledDate\": \"2024-02-10\",\n          \"priority\": \"medium\",\n          \"frequency\": \"weekly\"\n        },\n        {\n          \"name\": \"Fertilize\",\n          \"description\": \"Apply nitrogen-rich fertilizer\",\n          \"scheduledDate\": \"2024-02-15\",\n          \"priority\": \"high\",\n          \"frequency\": \"bi-weekly\"\n        }\n      ]\n    },\n    {\n      \"stageName\": \"Flowering\",\n      \"startDate\": \"2024-03-15\",\n      \"endDate\": \"2024-04-01\",\n      \"description\": \"Flower formation and pollination\",\n      \"careNeeds\": \"Ensure good air circulation and pollination\",\n      \"nutrientRequirements\": \"Phosphorus for flower development\",\n      \"expectedDuration\": 17,\n      \"tasks\": [\n        {\n          \"name\": \"Pollination check\",\n          \"description\": \"Ensure flowers are being pollinated\",\n          \"scheduledDate\": \"2024-03-20\",\n          \"priority\": \"high\",\n          \"frequency\": \"daily\"\n        }\n      ]\n    },\n    {\n      \"stageName\": \"Ripening\",\n      \"startDate\": \"2024-04-01\",\n      \"endDate\": \"2024-04-15\",\n      \"description\": \"Fruit development and ripening\",\n      \"careNeeds\": \"Reduce watering, protect from pests\",\n      \"nutrientRequirements\": \"Potassium for fruit quality\",\n      \"expectedDuration\": 14,\n      \"tasks\": [\n        {\n          \"name\": \"Harvest preparation\",\n          \"description\": \"Prepare harvesting tools and containers\",\n          \"scheduledDate\": \"2024-04-10\",\n          \"priority\": \"medium\",\n          \"frequency\": \"once\"\n        }\n      ]\n    }\n  ],\n  \"customReminders\": [\n    {\n      \"title\": \"Weather Check\",\n      \"date\": \"2024-02-20\",\n      \"description\": \"Check weather forecast for frost warnings\"\n    }\n  ],\n  \"successionNotes\": \"Plant next batch 2 weeks after first harvest\",\n  \"cropRotationGuidelines\": \"Avoid planting tomatoes in same spot for 3 years\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar",
+              "host": ["{{base_url}}"],
+              "path": ["calendar"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('calendar_id', response.data._id);",
+                  "    console.log('Calendar ID saved:', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Calendars",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar",
+              "host": ["{{base_url}}"],
+              "path": ["calendar"]
+            }
+          }
+        },
+        {
+          "name": "Get Calendars with Remaining Days (Dashboard)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/dashboard?isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "dashboard"],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Calendar by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Calendar (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cropName\": \"Tomato - Updated\",\n  \"variety\": \"Cherry Tomato Premium\",\n  \"expectedYield\": 60,\n  \"notes\": \"Updated with better variety\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Calendars by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{user_id}}/active",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{user_id}}", "active"]
+            }
+          }
+        },
+        {
+          "name": "Delete Calendar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Growth Stages Management",
+      "item": [
+        {
+          "name": "Add Growth Stage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stageName\": \"Budding\",\n  \"startDate\": \"2024-03-01\",\n  \"endDate\": \"2024-03-15\",\n  \"description\": \"Bud formation stage\",\n  \"careNeeds\": \"Monitor bud development\",\n  \"nutrientRequirements\": \"Balanced NPK\",\n  \"expectedDuration\": 14,\n  \"temperature\": {\n    \"min\": 18,\n    \"max\": 28,\n    \"optimal\": 23\n  },\n  \"humidity\": {\n    \"min\": 50,\n    \"max\": 70,\n    \"optimal\": 60\n  },\n  \"lightRequirements\": \"Full sun\",\n  \"tasks\": [\n    {\n      \"name\": \"Monitor buds\",\n      \"description\": \"Check bud development daily\",\n      \"scheduledDate\": \"2024-03-05\",\n      \"priority\": \"high\",\n      \"frequency\": \"daily\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/stages",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "stages"]
+            }
+          }
+        },
+        {
+          "name": "Add Task to Stage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Water deeply\",\n  \"description\": \"Deep watering to encourage root growth\",\n  \"scheduledDate\": \"2024-02-20\",\n  \"priority\": \"high\",\n  \"frequency\": \"weekly\",\n  \"notes\": \"Use drip irrigation if available\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/stages/{{stage_name}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "stages", "{{stage_name}}", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "Update Task Completion",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isCompleted\": true,\n  \"notes\": \"Task completed successfully. Plants look healthy.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/stages/{{stage_name}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "stages", "{{stage_name}}", "tasks", "{{task_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reminders & Notifications",
+      "item": [
+        {
+          "name": "Add Custom Reminder",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Check Soil pH\",\n  \"date\": \"2024-02-25\",\n  \"description\": \"Test soil pH levels and adjust if necessary\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/reminders",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "reminders"]
+            }
+          }
+        },
+        {
+          "name": "Get Upcoming Reminders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/reminders/upcoming?days=7",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "reminders", "upcoming"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Harvest Management",
+      "item": [
+        {
+          "name": "Update Harvest Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actualHarvestDate\": \"2024-04-12\",\n  \"actualYield\": 45,\n  \"yieldNotes\": \"Good harvest despite early frost\",\n  \"observations\": \"Tomatoes were smaller than expected but very flavorful\",\n  \"quantity\": 45,\n  \"unit\": \"kg\",\n  \"quality\": \"good\",\n  \"marketPrice\": 80,\n  \"totalValue\": 3600\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/harvest",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "harvest"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Email Notifications Test",
+      "item": [
+        {
+          "name": "Test Task Reminder Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userEmail\": \"test@example.com\",\n  \"userName\": \"Test Farmer\",\n  \"taskData\": {\n    \"name\": \"Water plants\",\n    \"cropName\": \"Tomato\",\n    \"stageName\": \"Vegetative\",\n    \"scheduledDate\": \"2024-02-20\",\n    \"description\": \"Deep watering session\",\n    \"priority\": \"high\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/test-email",
+              "host": ["{{base_url}}"],
+              "path": ["test-email"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Reports",
+      "item": [
+        {
+          "name": "Get Calendar Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/analytics",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Export Calendar to CSV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/export/csv",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "export", "csv"]
+            }
+          }
+        },
+        {
+          "name": "Export Calendar to PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendar/{{calendar_id}}/export/pdf",
+              "host": ["{{base_url}}"],
+              "path": ["calendar", "{{calendar_id}}", "export", "pdf"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+
