@@ -1,7 +1,7 @@
-#node_modules
-#*.env
-#*.node_modules
+node_modules
+*.env
+*.node_modules
 dist
-#*.postman
-#*.env
-#node_modules
+*.postman
+*.env
+node_modules
