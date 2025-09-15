@@ -1,364 +1,315 @@
 // src/services/email.service.js
-/**
- * Handles email sending (welcome, thank you) and Firebase links
- */
 const nodemailer = require('nodemailer');
-const {
-  generateEmailVerificationLink,
-  generatePasswordResetLink,
-} = require('../config/firebase');
+const logger = require('../utils/logger');
+const EmailLog = require('../models/EmailLog');
 
-// Create a transporter (using SMTP credentials from .env)
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_PORT === '465', // true for port 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Create transporter
+const createTransporter = () => {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465;
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
 
-/**
- * Generic email sending function
- * @param {string|object} to - Recipient email address or email options object
- * @param {string} subject - Email subject (optional if to is an object)
- * @param {string} html - HTML body of the email (optional if to is an object)
- */
-async function sendEmail(to, subject, html) {
+  const base = {
+    host,
+    port,
+    secure,
+  };
+
+  if (user && pass) {
+    return nodemailer.createTransport({
+      ...base,
+      auth: { user, pass }
+    });
+  }
+
+  // If creds missing, still create transport (e.g., local mailcatcher) but log a warning
+  logger.warn('SMTP credentials are missing. Emails may fail to send.');
+  return nodemailer.createTransport(base);
+};
+
+// Email templates
+const emailTemplates = {
+  bookingConfirmation: (data) => ({
+    subject: `Booking Confirmation - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">Booking Confirmed!</h2>
+        <p>Dear ${data.farmerName},</p>
+        <p>Your warehouse booking has been confirmed successfully.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Warehouse:</strong> ${data.warehouseName}</p>
+          <p><strong>Location:</strong> ${data.warehouseLocation}</p>
+          <p><strong>Storage Type:</strong> ${data.storageType}</p>
+          <p><strong>Produce:</strong> ${data.produceType} (${data.quantity} ${data.unit})</p>
+          <p><strong>Duration:</strong> ${data.startDate} to ${data.endDate}</p>
+          <p><strong>Total Amount:</strong> ₹${data.totalAmount}</p>
+        </div>
+        
+        <p>You will receive another email once the warehouse owner approves your booking.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  }),
+
+  paymentConfirmation: (data) => ({
+    subject: `Payment Confirmed - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">Payment Successful!</h2>
+        <p>Dear ${data.farmerName},</p>
+        <p>Your payment has been processed successfully.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Payment Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Payment ID:</strong> ${data.paymentId}</p>
+          <p><strong>Amount Paid:</strong> ₹${data.amount}</p>
+          <p><strong>Payment Method:</strong> ${data.paymentMethod}</p>
+          <p><strong>Transaction Date:</strong> ${data.paymentDate}</p>
+        </div>
+        
+        <p>Your booking is now awaiting warehouse owner approval.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  }),
+
+  bookingApproved: (data) => ({
+    subject: `Booking Approved - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">Booking Approved!</h2>
+        <p>Dear ${data.farmerName},</p>
+        <p>Great news! Your warehouse booking has been approved by the warehouse owner.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Warehouse:</strong> ${data.warehouseName}</p>
+          <p><strong>Owner:</strong> ${data.ownerName}</p>
+          <p><strong>Contact:</strong> ${data.ownerPhone}</p>
+          <p><strong>Storage Period:</strong> ${data.startDate} to ${data.endDate}</p>
+          <p><strong>Produce:</strong> ${data.produceType} (${data.quantity} ${data.unit})</p>
+        </div>
+        
+        <p>Please contact the warehouse owner for any specific instructions or requirements.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  }),
+
+  bookingRejected: (data) => ({
+    subject: `Booking Rejected - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc3545;">Booking Rejected</h2>
+        <p>Dear ${data.farmerName},</p>
+        <p>Unfortunately, your warehouse booking has been rejected by the warehouse owner.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Warehouse:</strong> ${data.warehouseName}</p>
+          <p><strong>Reason:</strong> ${data.rejectionReason}</p>
+        </div>
+        
+        <p>Your payment will be refunded within 3-5 business days.</p>
+        <p>You can try booking another warehouse or contact our support team for assistance.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  }),
+
+  refundProcessed: (data) => ({
+    subject: `Refund Processed - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">Refund Processed</h2>
+        <p>Dear ${data.farmerName},</p>
+        <p>Your refund has been processed successfully.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Refund Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Refund Amount:</strong> ₹${data.refundAmount}</p>
+          <p><strong>Refund Date:</strong> ${data.refundDate}</p>
+          <p><strong>Reason:</strong> ${data.refundReason}</p>
+        </div>
+        
+        <p>The refund will be credited to your original payment method within 3-5 business days.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  }),
+
+  newBookingNotification: (data) => ({
+    subject: `New Booking Request - ${data.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">New Booking Request</h2>
+        <p>Dear ${data.ownerName},</p>
+        <p>You have received a new booking request for your warehouse.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+          <p><strong>Farmer:</strong> ${data.farmerName}</p>
+          <p><strong>Contact:</strong> ${data.farmerPhone}</p>
+          <p><strong>Produce:</strong> ${data.produceType} (${data.quantity} ${data.unit})</p>
+          <p><strong>Storage Period:</strong> ${data.startDate} to ${data.endDate}</p>
+          <p><strong>Amount:</strong> ₹${data.totalAmount}</p>
+        </div>
+        
+        <p>Please log in to your dashboard to approve or reject this booking.</p>
+        <p>Thank you for using FarmerAI!</p>
+      </div>
+    `
+  })
+};
+
+// Send email function
+const sendEmail = async (to, template, data) => {
   try {
-    console.log('=== EMAIL SERVICE DEBUG ===');
-    console.log('Input parameters:', { to, subject, html });
-    console.log('Type of "to":', typeof to);
-    console.log('Is "to" an object?', typeof to === 'object' && to !== null);
+    const transporter = createTransporter();
+    const emailTemplate = emailTemplates[template];
     
-    // Handle both object and string parameters for backward compatibility
-    let emailOptions;
-    
-    if (typeof to === 'object' && to !== null) {
-      console.log('Processing object format email options');
-      // If to is an object, use it as email options
-      emailOptions = {
-        from: `"FarmerAI" <${process.env.EMAIL_USER}>`,
-        to: to.to,
-        subject: to.subject,
-        html: to.html || to.text, // Support both html and text
-        text: to.text
-      };
-      console.log('Extracted email options:', emailOptions);
-    } else {
-      console.log('Processing string format email options');
-      // If to is a string, use the old format
-      emailOptions = {
-        from: `"FarmerAI" <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        html,
-      };
+    if (!emailTemplate) {
+      throw new Error(`Email template '${template}' not found`);
     }
 
-    // Validate required fields with detailed logging
-    console.log('Validating email options:', emailOptions);
+    const emailContent = emailTemplate(data);
     
-    if (!emailOptions.to) {
-      console.error('VALIDATION ERROR: No recipient email address');
-      throw new Error('Recipient email address is required');
-    }
-    
-    if (!emailOptions.subject) {
-      console.error('VALIDATION ERROR: No email subject');
-      throw new Error('Email subject is required');
-    }
-    
-    if (!emailOptions.html && !emailOptions.text) {
-      console.error('VALIDATION ERROR: No email content');
-      throw new Error('Email content (html or text) is required');
-    }
-
-    // Ensure to is a string, not an object
-    const recipientEmail = String(emailOptions.to);
-    
-    // Additional validation for email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipientEmail)) {
-      console.error('VALIDATION ERROR: Invalid email format:', recipientEmail);
-      throw new Error(`Invalid email format: ${recipientEmail}`);
-    }
-    
-    console.log(`✅ VALIDATION PASSED`);
-    console.log(`📧 Sending email to: ${recipientEmail}`);
-    console.log(`📝 Email subject: ${emailOptions.subject}`);
-    console.log(`📄 Email content type: ${emailOptions.html ? 'HTML' : 'Text'}`);
-
     const mailOptions = {
-      ...emailOptions,
-      to: recipientEmail
+      from: `"FarmerAI" <${process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@farmerai.local'}>`,
+      to,
+      subject: emailContent.subject,
+      html: emailContent.html
     };
 
-    console.log('Final mail options:', mailOptions);
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${recipientEmail}. Message ID: ${info.messageId}`);
-    console.log('=== EMAIL SERVICE DEBUG END ===');
-    return info;
-  } catch (error) {
-    console.error('=== EMAIL SERVICE ERROR ===');
-    console.error(`❌ Email failed to send to ${to}:`, error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      response: error.response
+    const result = await transporter.sendMail(mailOptions);
+    
+    // Log email
+    await EmailLog.create({
+      to,
+      subject: emailContent.subject,
+      body: emailContent.html,
+      template,
+      status: 'success',
+      messageId: result.messageId,
+      data
     });
-    console.error('=== EMAIL SERVICE ERROR END ===');
-    throw new Error(`Email sending failed: ${error.message}`);
+
+    logger.info(`Email sent successfully to ${to}: ${template}`);
+    return result;
+  } catch (error) {
+    // Log failed email
+    // Attempt to include body if template is available
+    let subjectFallback = 'Unknown';
+    let bodyFallback = '';
+    try {
+      const tmpl = emailTemplates[template];
+      if (tmpl) {
+        const content = tmpl(data || {});
+        subjectFallback = content.subject || subjectFallback;
+        bodyFallback = content.html || bodyFallback;
+      }
+    } catch (_) {}
+
+    await EmailLog.create({
+      to,
+      subject: subjectFallback,
+      body: bodyFallback,
+      template,
+      status: 'failed',
+      error: error.message,
+      data
+    });
+
+    logger.error(`Failed to send email to ${to}: ${error.message}`);
+    throw error;
   }
-}
+};
 
-/**
- * Send a welcome email after registration
- */
-async function sendWelcomeEmail(to, name) {
-  const subject = 'Welcome to FarmerAI 🌱';
-  const html = `
-    <h2>Welcome, ${name}!</h2>
-    <p>Thank you for joining <b>FarmerAI</b>.</p>
-    <p>We’re excited to help you grow smarter with AI-powered farming assistance.</p>
-    <p>Happy Farming 🌾,<br/>The FarmerAI Team</p>
-  `;
-  return sendEmail(to, subject, html);
-}
+// Send a raw email with explicit subject and HTML (no template lookup)
+const sendRawEmail = async (to, subject, html) => {
+  try {
+    const transporter = createTransporter();
+    const mailOptions = {
+      from: `"FarmerAI" <${process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@farmerai.local'}>`,
+      to,
+      subject,
+      html
+    };
 
-/**
- * Send a thank-you confirmation email
- */
-async function sendThankYouEmail(to, name) {
-  const subject = 'Thank you for registering 🙏';
-  const html = `
-    <h2>Hi ${name},</h2>
-    <p>We appreciate you registering with <b>FarmerAI</b>.</p>
-    <p>Your account has been successfully created. Please verify your email to get started.</p>
-    <p>Cheers,<br/>The FarmerAI Team</p>
-  `;
-  return sendEmail(to, subject, html);
-}
+    const result = await transporter.sendMail(mailOptions);
 
-/**
- * Generate Firebase verification link
- */
-async function sendVerificationEmail(email) {
-  return generateEmailVerificationLink(email);
-}
+    await EmailLog.create({
+      to,
+      subject,
+      body: html || '',
+      template: 'raw',
+      status: 'success',
+      messageId: result.messageId
+    });
 
-/**
- * Generate Firebase password reset link
- */
-async function sendPasswordResetEmail(email) {
-  return generatePasswordResetLink(email);
-}
-
-/**
- * Send growth calendar task reminder email
- */
-async function sendTaskReminderEmail(userEmail, userName, taskData) {
-  const subject = `🌱 Reminder: ${taskData.name} for ${taskData.cropName}`;
-  const dueDate = new Date(taskData.scheduledDate || taskData.date).toLocaleDateString();
-  
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #4CAF50, #8BC34A); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px;">🌱 FarmerAI Reminder</h1>
-      </div>
-      
-      <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #2E7D32; margin-top: 0;">Hello ${userName}!</h2>
-        
-        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #4CAF50;">
-          <h3 style="color: #2E7D32; margin-top: 0;">📋 Task Reminder</h3>
-          <p><strong>Task:</strong> ${taskData.name}</p>
-          <p><strong>Crop:</strong> ${taskData.cropName}</p>
-          <p><strong>Stage:</strong> ${taskData.stageName}</p>
-          <p><strong>Due Date:</strong> ${dueDate}</p>
-          ${taskData.description ? `<p><strong>Description:</strong> ${taskData.description}</p>` : ''}
-          ${taskData.priority ? `<p><strong>Priority:</strong> <span style="color: ${taskData.priority === 'high' ? '#f44336' : taskData.priority === 'medium' ? '#ff9800' : '#4CAF50'};">${taskData.priority.toUpperCase()}</span></p>` : ''}
-        </div>
-        
-        <div style="background: #E8F5E8; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <h4 style="color: #2E7D32; margin-top: 0;">💡 Care Tips</h4>
-          <p>Make sure to:</p>
-          <ul>
-            <li>Check weather conditions before performing the task</li>
-            <li>Use appropriate tools and safety equipment</li>
-            <li>Record any observations in your growth calendar</li>
-            <li>Take photos to track progress</li>
-          </ul>
-        </div>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 20px;">
-          This is an automated reminder from FarmerAI. Log in to your dashboard to mark this task as completed.
-        </p>
-        
-        <div style="text-align: center; margin-top: 20px;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard" 
-             style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            View Dashboard
-          </a>
-        </div>
-      </div>
-      
-      <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
-        <p>© 2024 FarmerAI. Growing smarter with AI-powered farming assistance.</p>
-      </div>
-    </div>
-  `;
-  
-  return sendEmail(userEmail, subject, html);
-}
-
-/**
- * Send harvest countdown email
- */
-async function sendHarvestCountdownEmail(userEmail, userName, calendarData) {
-  const daysLeft = calendarData.remainingDaysToHarvest;
-  const harvestDate = new Date(calendarData.harvestDate).toLocaleDateString();
-  
-  let subject, urgencyColor, urgencyText;
-  
-  if (daysLeft <= 0) {
-    subject = `🎉 Harvest Time! ${calendarData.cropName} is ready`;
-    urgencyColor = '#4CAF50';
-    urgencyText = 'Ready for Harvest!';
-  } else if (daysLeft <= 3) {
-    subject = `⚠️ Harvest Alert: ${calendarData.cropName} ready in ${daysLeft} days`;
-    urgencyColor = '#ff9800';
-    urgencyText = 'Harvest Soon!';
-  } else if (daysLeft <= 7) {
-    subject = `📅 Harvest Countdown: ${calendarData.cropName} in ${daysLeft} days`;
-    urgencyColor = '#2196F3';
-    urgencyText = 'Harvest Approaching';
-  } else {
-    subject = `📊 Growth Update: ${calendarData.cropName} - ${daysLeft} days to harvest`;
-    urgencyColor = '#9C27B0';
-    urgencyText = 'Growing Well';
+    logger.info(`Email sent successfully to ${to}: ${subject}`);
+    return result;
+  } catch (error) {
+    await EmailLog.create({
+      to,
+      subject,
+      body: html || '',
+      template: 'raw',
+      status: 'failed',
+      error: error.message
+    });
+    logger.error(`Failed to send raw email to ${to}: ${error.message}`);
+    throw error;
   }
-  
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, ${urgencyColor}, #8BC34A); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px;">🌾 ${urgencyText}</h1>
-      </div>
-      
-      <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #2E7D32; margin-top: 0;">Hello ${userName}!</h2>
-        
-        <div style="background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center; border: 2px solid ${urgencyColor};">
-          <h3 style="color: ${urgencyColor}; margin-top: 0; font-size: 28px;">
-            ${daysLeft <= 0 ? '🎉' : daysLeft <= 3 ? '⚠️' : daysLeft <= 7 ? '📅' : '📊'} 
-            ${daysLeft <= 0 ? 'Ready for Harvest!' : `${daysLeft} Days to Harvest`}
-          </h3>
-          <p style="font-size: 18px; margin: 10px 0;"><strong>Crop:</strong> ${calendarData.cropName}</p>
-          <p style="font-size: 16px; margin: 5px 0;"><strong>Expected Harvest:</strong> ${harvestDate}</p>
-          ${calendarData.variety ? `<p style="font-size: 16px; margin: 5px 0;"><strong>Variety:</strong> ${calendarData.variety}</p>` : ''}
-        </div>
-        
-        ${daysLeft <= 0 ? `
-        <div style="background: #E8F5E8; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <h4 style="color: #2E7D32; margin-top: 0;">🎉 Harvest Checklist</h4>
-          <ul>
-            <li>Check crop maturity indicators</li>
-            <li>Prepare harvesting tools</li>
-            <li>Plan harvest timing (early morning recommended)</li>
-            <li>Prepare storage facilities</li>
-            <li>Record actual harvest date and yield</li>
-          </ul>
-        </div>
-        ` : daysLeft <= 3 ? `
-        <div style="background: #FFF3E0; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <h4 style="color: #E65100; margin-top: 0;">⚠️ Pre-Harvest Tasks</h4>
-          <ul>
-            <li>Final pest and disease check</li>
-            <li>Stop watering 2-3 days before harvest</li>
-            <li>Prepare harvesting equipment</li>
-            <li>Check weather forecast</li>
-            <li>Plan harvest logistics</li>
-          </ul>
-        </div>
-        ` : `
-        <div style="background: #E3F2FD; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <h4 style="color: #1976D2; margin-top: 0;">📊 Current Stage Care</h4>
-          <p>Continue monitoring your crop's progress and maintain optimal growing conditions.</p>
-          <ul>
-            <li>Monitor soil moisture levels</li>
-            <li>Check for pests and diseases</li>
-            <li>Ensure proper nutrition</li>
-            <li>Document growth observations</li>
-          </ul>
-        </div>
-        `}
-        
-        <div style="text-align: center; margin-top: 20px;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/growth-calendar/${calendarData._id}" 
-             style="background: ${urgencyColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            View Growth Calendar
-          </a>
-        </div>
-      </div>
-      
-      <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
-        <p>© 2024 FarmerAI. Growing smarter with AI-powered farming assistance.</p>
-      </div>
-    </div>
-  `;
-  
-  return sendEmail(userEmail, subject, html);
-}
+};
 
-/**
- * Send custom reminder email
- */
-async function sendCustomReminderEmail(userEmail, userName, reminderData) {
-  const subject = `🔔 Reminder: ${reminderData.title}`;
-  const dueDate = new Date(reminderData.date).toLocaleDateString();
-  
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #9C27B0, #E91E63); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px;">🔔 Custom Reminder</h1>
-      </div>
-      
-      <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #2E7D32; margin-top: 0;">Hello ${userName}!</h2>
-        
-        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #9C27B0;">
-          <h3 style="color: #9C27B0; margin-top: 0;">📝 Your Reminder</h3>
-          <p><strong>Title:</strong> ${reminderData.title}</p>
-          <p><strong>Due Date:</strong> ${dueDate}</p>
-          ${reminderData.description ? `<p><strong>Description:</strong> ${reminderData.description}</p>` : ''}
-        </div>
-        
-        <div style="text-align: center; margin-top: 20px;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard" 
-             style="background: #9C27B0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            View Dashboard
-          </a>
-        </div>
-      </div>
-      
-      <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
-        <p>© 2024 FarmerAI. Growing smarter with AI-powered farming assistance.</p>
-      </div>
-    </div>
-  `;
-  
-  return sendEmail(userEmail, subject, html);
-}
+// Send booking confirmation email
+const sendBookingConfirmation = async (farmerEmail, bookingData) => {
+  return sendEmail(farmerEmail, 'bookingConfirmation', bookingData);
+};
+
+// Send payment confirmation email
+const sendPaymentConfirmation = async (farmerEmail, paymentData) => {
+  return sendEmail(farmerEmail, 'paymentConfirmation', paymentData);
+};
+
+// Send booking approved email
+const sendBookingApproved = async (farmerEmail, bookingData) => {
+  return sendEmail(farmerEmail, 'bookingApproved', bookingData);
+};
+
+// Send booking rejected email
+const sendBookingRejected = async (farmerEmail, bookingData) => {
+  return sendEmail(farmerEmail, 'bookingRejected', bookingData);
+};
+
+// Send refund processed email
+const sendRefundProcessed = async (farmerEmail, refundData) => {
+  return sendEmail(farmerEmail, 'refundProcessed', refundData);
+};
+
+// Send new booking notification to warehouse owner
+const sendNewBookingNotification = async (ownerEmail, bookingData) => {
+  return sendEmail(ownerEmail, 'newBookingNotification', bookingData);
+};
 
 module.exports = {
-  sendEmail, // Export the generic function
-  sendWelcomeEmail,
-  sendThankYouEmail,
-  sendVerificationEmail,
-  sendPasswordResetEmail,
-  sendTaskReminderEmail,
-  sendHarvestCountdownEmail,
-  sendCustomReminderEmail,
+  sendEmail,
+  sendRawEmail,
+  sendBookingConfirmation,
+  sendPaymentConfirmation,
+  sendBookingApproved,
+  sendBookingRejected,
+  sendRefundProcessed,
+  sendNewBookingNotification
 };

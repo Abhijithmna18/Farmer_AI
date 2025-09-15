@@ -6,6 +6,10 @@ const Contact = require('../models/Contact');
 const Product = require('../models/Product');
 const GrowthCalendar = require('../models/GrowthCalendar');
 const SoilRecord = require('../models/SoilRecord');
+const Warehouse = require('../models/Warehouse');
+const Booking = require('../models/Booking');
+const Payment = require('../models/Payment');
+const { createRefund } = require('../config/razorpay');
 
 // Overview Statistics
 exports.getOverviewStats = async (req, res) => {
@@ -419,5 +423,385 @@ exports.getReports = async (req, res) => {
   } catch (error) {
     console.error('Error fetching reports:', error);
     res.status(500).json({ message: 'Failed to fetch reports.' });
+  }
+};
+
+// Warehouse Management
+exports.getWarehouses = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, verified } = req.query;
+    
+    const query = {};
+    if (status) query.status = status;
+    if (verified !== undefined) query['verification.status'] = verified;
+
+    const warehouses = await Warehouse.find(query)
+      .populate('owner', 'firstName lastName email phone')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Warehouse.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: warehouses,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching warehouses:', error);
+    res.status(500).json({ message: 'Failed to fetch warehouses.' });
+  }
+};
+
+exports.getWarehouseById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const warehouse = await Warehouse.findById(id)
+      .populate('owner', 'firstName lastName email phone warehouseOwnerProfile')
+      .populate('bookings', 'bookingId status bookingDates produce');
+
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warehouse not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: warehouse
+    });
+  } catch (error) {
+    console.error('Error fetching warehouse:', error);
+    res.status(500).json({ message: 'Failed to fetch warehouse.' });
+  }
+};
+
+exports.verifyWarehouse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const warehouse = await Warehouse.findById(id);
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warehouse not found'
+      });
+    }
+
+    warehouse.verification.status = status;
+    warehouse.verification.verifiedAt = new Date();
+    warehouse.verification.verifiedBy = req.user.id;
+    warehouse.verification.notes = notes;
+
+    await warehouse.save();
+
+    res.json({
+      success: true,
+      message: 'Warehouse verification updated successfully',
+      data: warehouse
+    });
+  } catch (error) {
+    console.error('Error verifying warehouse:', error);
+    res.status(500).json({ message: 'Failed to verify warehouse.' });
+  }
+};
+
+exports.deleteWarehouse = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const warehouse = await Warehouse.findById(id);
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warehouse not found'
+      });
+    }
+
+    // Check for active bookings
+    const activeBookings = await Booking.countDocuments({
+      warehouse: id,
+      status: { $in: ['paid', 'awaiting-approval', 'approved'] }
+    });
+
+    if (activeBookings > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete warehouse with active bookings'
+      });
+    }
+
+    await Warehouse.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: 'Warehouse deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting warehouse:', error);
+    res.status(500).json({ message: 'Failed to delete warehouse.' });
+  }
+};
+
+// Booking Management
+exports.getBookings = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, dateFrom, dateTo } = req.query;
+    
+    const query = {};
+    if (status) query.status = status;
+    if (dateFrom || dateTo) {
+      query['bookingDates.startDate'] = {};
+      if (dateFrom) query['bookingDates.startDate'].$gte = new Date(dateFrom);
+      if (dateTo) query['bookingDates.startDate'].$lte = new Date(dateTo);
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('farmer', 'firstName lastName email phone')
+      .populate('warehouse', 'name location')
+      .populate('warehouseOwner', 'firstName lastName email phone')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Booking.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: bookings,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ message: 'Failed to fetch bookings.' });
+  }
+};
+
+exports.getBookingById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const booking = await Booking.findById(id)
+      .populate('farmer', 'firstName lastName email phone farmerProfile')
+      .populate('warehouse', 'name location facilities images')
+      .populate('warehouseOwner', 'firstName lastName email phone warehouseOwnerProfile');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: booking
+    });
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    res.status(500).json({ message: 'Failed to fetch booking.' });
+  }
+};
+
+exports.updateBookingStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    booking.status = status;
+    if (notes) {
+      booking.communication.push({
+        sender: req.user.id,
+        message: `Admin update: ${notes}`,
+        timestamp: new Date()
+      });
+    }
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      message: 'Booking status updated successfully',
+      data: booking
+    });
+  } catch (error) {
+    console.error('Error updating booking status:', error);
+    res.status(500).json({ message: 'Failed to update booking status.' });
+  }
+};
+
+// Payment Management
+exports.getPayments = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, dateFrom, dateTo } = req.query;
+    
+    const query = {};
+    if (status) query.status = status;
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    const payments = await Payment.find(query)
+      .populate('farmer', 'firstName lastName email phone')
+      .populate('warehouseOwner', 'firstName lastName email phone')
+      .populate('booking', 'bookingId warehouse produce')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Payment.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: payments,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ message: 'Failed to fetch payments.' });
+  }
+};
+
+exports.getPaymentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const payment = await Payment.findById(id)
+      .populate('farmer', 'firstName lastName email phone')
+      .populate('warehouseOwner', 'firstName lastName email phone')
+      .populate('booking', 'bookingId warehouse produce bookingDates');
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: payment
+    });
+  } catch (error) {
+    console.error('Error fetching payment:', error);
+    res.status(500).json({ message: 'Failed to fetch payment.' });
+  }
+};
+
+exports.processRefund = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      });
+    }
+
+    if (!payment.razorpay.paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment ID found for refund'
+      });
+    }
+
+    const refundAmount = amount || payment.amount.total;
+    const refund = await createRefund(
+      payment.razorpay.paymentId,
+      refundAmount,
+      { reason: reason || 'Admin initiated refund' }
+    );
+
+    // Update payment record
+    payment.refund.razorpayRefundId = refund.id;
+    payment.refund.amount = refundAmount;
+    payment.refund.status = 'processed';
+    payment.refund.reason = reason;
+    payment.refund.processedAt = new Date();
+    payment.amount.amountRefunded = refundAmount;
+    payment.status = 'refunded';
+
+    await payment.save();
+
+    res.json({
+      success: true,
+      message: 'Refund processed successfully',
+      data: { refund, payment }
+    });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    res.status(500).json({ message: 'Failed to process refund.' });
+  }
+};
+
+// Analytics
+exports.getWarehouseAnalytics = async (req, res) => {
+  try {
+    const stats = await Warehouse.getStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching warehouse analytics:', error);
+    res.status(500).json({ message: 'Failed to fetch warehouse analytics.' });
+  }
+};
+
+exports.getBookingAnalytics = async (req, res) => {
+  try {
+    const stats = await Booking.getStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching booking analytics:', error);
+    res.status(500).json({ message: 'Failed to fetch booking analytics.' });
+  }
+};
+
+exports.getPaymentAnalytics = async (req, res) => {
+  try {
+    const stats = await Payment.getStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching payment analytics:', error);
+    res.status(500).json({ message: 'Failed to fetch payment analytics.' });
   }
 };

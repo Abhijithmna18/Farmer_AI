@@ -7,12 +7,12 @@ import { glass } from '../styles/globalStyles';
 const galleryItems = [
   { id: 1, src: "/public/farm.jpg", title: "Soil Testing", description: "AI-powered soil analysis for optimal crop growth.", alt: "Soil being tested" },
   { id: 2, src: "/public/image.png", title: "Healthy Crops", description: "Vibrant crops thriving with FarmerAI recommendations.", alt: "Healthy crops in a field" },
-  { id: 3, src: "", title: "Community Event", description: "Farmers gathering at a local FarmerAI workshop.", alt: "Farmers at a community event" },
-  { id: 4, src: "https://via.placeholder.com/600x400/33FF57/FFFFFF?text=Tutorial+Image+1", title: "Planting Tutorial", description: "Step-by-step guide on efficient planting techniques.", alt: "Hands planting a seedling" },
-  { id: 5, src: "https://via.placeholder.com/600x400/3357FF/FFFFFF?text=Crop+Variety+1", title: "New Crop Variety", description: "Introducing a drought-resistant crop for arid regions.", alt: "New crop variety" },
-  { id: 6, src: "https://via.placeholder.com/600x400/FF33A1/FFFFFF?text=Soil+Type+2", title: "Clay Soil", description: "Understanding the properties of clay soil for better management.", alt: "Close-up of clay soil" },
-  { id: 7, src: "https://via.placeholder.com/600x400/A1FF33/FFFFFF?text=Event+Highlight+2", title: "Harvest Festival", description: "Celebrating a bountiful harvest with the FarmerAI community.", alt: "Harvest festival celebration" },
-  { id: 8, src: "https://via.placeholder.com/600x400/33A1FF/FFFFFF?text=Tutorial+Image+2", title: "Irrigation Setup", description: "Setting up an automated irrigation system.", alt: "Irrigation system in a field" },
+  { id: 3, src: "/public/Community Event.png", title: "Community Event", description: "Farmers gathering at a local FarmerAI workshop.", alt: "Farmers at a community event" },
+  { id: 4, src: "/public/Planting Tutorial.png", title: "Planting Tutorial", description: "Step-by-step guide on efficient planting techniques.", alt: "Hands planting a seedling" },
+  { id: 5, src: "/public/New Crop Variety.png", title: "New Crop Variety", description: "Introducing a drought-resistant crop for arid regions.", alt: "New crop variety" },
+  { id: 6, src: "/public/Clay Soil.png", title: "Clay Soil", description: "Understanding the properties of clay soil for better management.", alt: "Close-up of clay soil" },
+  { id: 7, src: "/public/Harvest Festival.png", title: "Harvest Festival", description: "Celebrating a bountiful harvest with the FarmerAI community.", alt: "Harvest festival celebration" },
+  { id: 8, src: "/public/Irrigation Setup.png", title: "Irrigation Setup", description: "Setting up an automated irrigation system.", alt: "Irrigation system in a field" },
 ];
 
 // GalleryCard Component

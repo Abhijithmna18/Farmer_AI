@@ -9,6 +9,7 @@ router.use(authenticateToken);
 // Profile routes
 router.get('/', profileController.getProfile);
 router.put('/', profileController.updateProfile);
+router.post('/become-warehouse-owner', profileController.becomeWarehouseOwner);
 router.post('/profile-picture', profileController.upload.single('profilePicture'), profileController.uploadProfilePicture);
 router.delete('/profile-picture', profileController.removeProfilePicture);
 router.put('/email', profileController.updateEmail);

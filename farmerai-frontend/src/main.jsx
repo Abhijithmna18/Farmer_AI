@@ -6,13 +6,13 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles/global.css";
 import "./i18n";
 
-// Minimal theme initializer: apply saved preference or system preference
+// Minimal theme initializer: apply saved preference or default to light
 (function initTheme() {
   try {
     const key = "theme";
     const stored = localStorage.getItem(key);
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = stored || (prefersDark ? "dark" : "light");
+    // Default to light mode, only use system preference if no stored preference
+    const theme = stored || "light";
     document.documentElement.classList.toggle("dark", theme === "dark");
   } catch (_) {}
 })();

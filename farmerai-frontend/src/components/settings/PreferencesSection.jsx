@@ -3,9 +3,11 @@ import { motion } from 'framer-motion';
 import { Globe, Palette, Clock, Ruler, Save } from 'lucide-react';
 import { getPreferences, updatePreferences as updatePreferencesAPI } from '../../services/settingsService';
 import { useTheme } from '../../context/ThemeContext';
+import useAuth from '../../hooks/useAuth';
 
 export default function PreferencesSection({ loading, setLoading, showToast }) {
   const { theme, setThemeMode } = useTheme();
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState({
     language: 'en',
     theme: theme,
@@ -15,8 +17,13 @@ export default function PreferencesSection({ loading, setLoading, showToast }) {
   });
 
   useEffect(() => {
-    // Load user preferences from API
+    // Load user preferences from API only if user is authenticated
     const loadPreferences = async () => {
+      if (!user) {
+        console.log('User not authenticated, skipping preferences load');
+        return;
+      }
+      
       try {
         const response = await getPreferences();
         setPreferences(response.preferences);
@@ -31,9 +38,14 @@ export default function PreferencesSection({ loading, setLoading, showToast }) {
     };
     
     loadPreferences();
-  }, []);
+  }, [user]);
 
   const handlePreferencesUpdate = async () => {
+    if (!user) {
+      showToast('Please log in to save preferences.', 'error');
+      return;
+    }
+    
     setLoading(true);
     try {
       const response = await updatePreferencesAPI(preferences);

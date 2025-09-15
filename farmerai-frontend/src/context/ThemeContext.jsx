@@ -17,25 +17,17 @@ export function ThemeProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState({ message: '', type: 'info' });
 
-  // Detect system preference
-  const getSystemPreference = () => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  };
-
-  // Load theme from localStorage or system preference
+  // Load theme from localStorage or default to light
   const loadTheme = () => {
     try {
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme && ['light', 'dark'].includes(savedTheme)) {
         return savedTheme;
       }
-      return getSystemPreference();
+      return 'light'; // Default to light mode
     } catch (error) {
       console.error('Error loading theme from localStorage:', error);
-      return getSystemPreference();
+      return 'light'; // Default to light mode
     }
   };
 
@@ -94,14 +86,20 @@ export function ThemeProvider({ children }) {
         
         // Try to load theme from database (if user is logged in)
         try {
-          // Use apiClient so auth header is included
-          const { default: apiClient } = await import('../services/apiClient');
-          const response = await apiClient.get('/settings/preferences');
-          const data = response.data || response;
-          if (data.preferences?.theme) {
-            setTheme(data.preferences.theme);
-            applyTheme(data.preferences.theme);
-            saveThemeToStorage(data.preferences.theme);
+          // Check if user is authenticated before making API call
+          const token = localStorage.getItem('token');
+          if (token) {
+            // Use apiClient so auth header is included
+            const { default: apiClient } = await import('../services/apiClient');
+            const response = await apiClient.get('/settings/preferences');
+            const data = response.data || response;
+            if (data.preferences?.theme) {
+              setTheme(data.preferences.theme);
+              applyTheme(data.preferences.theme);
+              saveThemeToStorage(data.preferences.theme);
+            }
+          } else {
+            console.log('No authentication token found, using localStorage theme');
           }
         } catch (dbError) {
           // User might not be logged in, continue with localStorage theme

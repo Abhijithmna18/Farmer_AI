@@ -57,6 +57,11 @@ app.use('/api/user', require('./src/routes/profile.routes'));
 app.use('/api/marketplace', require('./src/routes/marketplace.routes'));
 app.use('/api/soil-records', require('./src/routes/soilRecord.routes'));
 app.use('/api/equipment', require('./src/routes/equipment.routes'));
+app.use('/api/community', require('./src/routes/community.routes'));
+app.use('/api/feedback', require('./src/routes/feedback.routes'));
+app.use('/api/warehouses', require('./src/routes/warehouse.routes'));
+app.use('/api/razorpay', require('./src/routes/razorpay.routes'));
+app.use('/api/test-razorpay', require('./src/routes/test-razorpay.routes'));
 
 // Health check
 app.get('/', (req, res) => {

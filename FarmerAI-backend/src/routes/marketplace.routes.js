@@ -5,7 +5,6 @@ const { authenticateToken } = require('../middlewares/auth.middleware');
 const marketplaceController = require('../controllers/marketplace.controller');
 const cartController = require('../controllers/cart.controller');
 const orderController = require('../controllers/order.controller');
-const paymentController = require('../controllers/payment.controller');
 
 // Configure multer for product image uploads
 const upload = multer({
@@ -64,13 +63,8 @@ router.post('/orders/:id/messages', orderController.addOrderMessage);
 router.get('/orders/stats', orderController.getOrderStats);
 router.get('/orders/date-range', orderController.getOrdersByDateRange);
 
-// Payment routes
-router.post('/payments/create', paymentController.createPaymentOrder);
-router.post('/payments/verify', paymentController.verifyPayment);
-router.get('/payments/:transactionId/status', paymentController.getPaymentStatus);
-router.post('/payments/:transactionId/refund', paymentController.processRefund);
-router.get('/payments', paymentController.getUserTransactions);
-router.get('/payments/stats', paymentController.getTransactionStats);
+// Payment routes (moved to dedicated Razorpay routes)
+// Use /api/razorpay/* endpoints for payment processing
 
 // Marketplace statistics
 router.get('/stats', marketplaceController.getMarketplaceStats);

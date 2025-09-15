@@ -185,6 +185,51 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// Become warehouse owner (self-service role upgrade)
+exports.becomeWarehouseOwner = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // If already a warehouse owner, no-op
+    const roles = Array.isArray(user.roles) ? new Set(user.roles) : new Set();
+    roles.add('warehouse-owner');
+
+    user.roles = Array.from(roles);
+    user.role = 'warehouse-owner';
+    user.userType = 'warehouse-owner';
+
+    // Initialize warehouseOwnerProfile if not present
+    if (!user.warehouseOwnerProfile) {
+      user.warehouseOwnerProfile = {
+        verificationStatus: 'pending',
+        isActive: true
+      };
+    }
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Upgraded to warehouse owner successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        roles: user.roles,
+        role: user.role,
+        userType: user.userType
+      }
+    });
+  } catch (error) {
+    console.error('becomeWarehouseOwner error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to upgrade role' });
+  }
+};
+
 // Upload profile picture
 exports.uploadProfilePicture = async (req, res) => {
   try {

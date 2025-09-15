@@ -40,4 +40,25 @@ router.get('/registrations', adminController.getRegistrations);
 router.get('/email-logs', adminController.getEmailLogs);
 router.patch('/email-logs/:logId/retry', adminController.retryEmail);
 
+// Warehouse Management
+router.get('/warehouses', adminController.getWarehouses);
+router.get('/warehouses/:id', adminController.getWarehouseById);
+router.patch('/warehouses/:id/verify', adminController.verifyWarehouse);
+router.delete('/warehouses/:id', adminController.deleteWarehouse);
+
+// Booking Management
+router.get('/bookings', adminController.getBookings);
+router.get('/bookings/:id', adminController.getBookingById);
+router.patch('/bookings/:id/status', adminController.updateBookingStatus);
+
+// Payment Management
+router.get('/payments', adminController.getPayments);
+router.get('/payments/:id', adminController.getPaymentById);
+router.post('/payments/:id/refund', adminController.processRefund);
+
+// Analytics
+router.get('/analytics/warehouses', adminController.getWarehouseAnalytics);
+router.get('/analytics/bookings', adminController.getBookingAnalytics);
+router.get('/analytics/payments', adminController.getPaymentAnalytics);
+
 module.exports = router;

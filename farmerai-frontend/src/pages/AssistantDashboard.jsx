@@ -161,7 +161,6 @@ const AssistantDashboard = () => {
                 <div className="text-2xl mb-1">{w.icon === 'rain' ? '🌧️' : w.icon === 'cloud' ? '☁️' : '☀️'}</div>
                 <div>Rain: {w.rain ?? 0} mm</div>
                 <div>Temp: {w.temp}°C</div>
-                <div>Humidity: {w.humidity}%</div>
               </div>
             ))}
           </div>
@@ -176,7 +175,7 @@ const AssistantDashboard = () => {
                 <div key={i} className="p-2 border rounded-lg bg-white text-xs">
                   <div className="font-medium">{h.time}</div>
                   <div>{h.icon === 'rain' ? '🌧️' : h.icon === 'cloud' ? '☁️' : '☀️'}</div>
-                  <div>{h.temp}°C • {h.humidity}%</div>
+                  <div>{h.temp}°C •%</div>
                 </div>
               ))}
             </div>
@@ -192,6 +191,13 @@ const AssistantDashboard = () => {
 };
 
 export default AssistantDashboard;
+
+
+
+
+
+
+
 
 
 

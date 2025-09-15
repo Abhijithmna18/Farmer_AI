@@ -111,4 +111,31 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken };
+/**
+ * Middleware to require specific roles
+ * @param {Array} allowedRoles - Array of allowed roles
+ */
+const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        message: 'Authentication required',
+        error: 'User not authenticated'
+      });
+    }
+
+    const userRoles = req.user.roles || [req.user.role].filter(Boolean);
+    const hasRequiredRole = allowedRoles.some(role => userRoles.includes(role));
+
+    if (!hasRequiredRole) {
+      return res.status(403).json({
+        message: 'Access denied',
+        error: `Required roles: ${allowedRoles.join(', ')}. User roles: ${userRoles.join(', ')}`
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = { authenticateToken, requireRole };

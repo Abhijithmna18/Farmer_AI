@@ -16,7 +16,8 @@ export default function Register() {
     lastName: "", 
     email: "", 
     password: "", 
-    confirmPassword: "" 
+    confirmPassword: "",
+    role: "farmer"
   });
   const [toast, setToast] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -186,6 +187,7 @@ export default function Register() {
         email: form.email,
         password: form.password || undefined,
         confirmPassword: form.password ? form.confirmPassword : undefined,
+        role: form.role,
       });
       if (res?.data?.success) {
         if (res?.data?.requiresVerification) {
@@ -326,6 +328,59 @@ export default function Register() {
           </div>
           
           <div ref={el => fieldsRef.current[3] = el} style={{ opacity: 0 }}>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                I want to register as:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  form.role === 'farmer' 
+                    ? 'border-green-500 bg-green-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="farmer"
+                    checked={form.role === 'farmer'}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl">🌱</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Farmer</div>
+                      <div className="text-sm text-gray-500">Book storage facilities</div>
+                    </div>
+                  </div>
+                </label>
+                
+                <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  form.role === 'warehouse-owner' 
+                    ? 'border-green-500 bg-green-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="warehouse-owner"
+                    checked={form.role === 'warehouse-owner'}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl">🏪</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Warehouse Owner</div>
+                      <div className="text-sm text-gray-500">List storage facilities</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          <div ref={el => fieldsRef.current[4] = el} style={{ opacity: 0 }}>
             <PasswordField 
               label="Create Password" 
               placeholder="••••••••"
@@ -334,7 +389,7 @@ export default function Register() {
             />
           </div>
           
-          <div ref={el => fieldsRef.current[4] = el} style={{ opacity: 0 }}>
+          <div ref={el => fieldsRef.current[5] = el} style={{ opacity: 0 }}>
             <PasswordField 
               label="Confirm Password" 
               placeholder="••••••••"

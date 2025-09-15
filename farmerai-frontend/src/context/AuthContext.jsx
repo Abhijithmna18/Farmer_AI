@@ -144,3 +144,12 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+// Custom hook to use the auth context
+export function useAuth() {
+  const context = React.useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

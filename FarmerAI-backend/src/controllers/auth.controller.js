@@ -34,11 +34,20 @@ function hashOtp(otp) {
 
 /**
  * Register a new user
- * Expects: { firstName, lastName, email, password?, confirmPassword? }
+ * Expects: { name? | firstName, lastName, email, password?, confirmPassword?, role? }
  */
 exports.register = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, confirmPassword } = req.body;
+    const { name, firstName: fn, lastName: ln, email, password, confirmPassword, role } = req.body;
+
+    // Split name if provided
+    let firstName = fn;
+    let lastName = ln;
+    if (name && (!firstName || !lastName)) {
+      const parts = String(name).trim().split(/\s+/);
+      firstName = firstName || parts[0];
+      lastName = lastName || parts.slice(1).join(' ') || 'User';
+    }
 
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ success: false, message: 'First name, last name and email are required.' });
@@ -61,6 +70,18 @@ exports.register = async (req, res, next) => {
     const otpCode = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
+    // Validate/map role
+    const roleMap = {
+      user: 'farmer',
+      owner: 'warehouse-owner',
+      farmer: 'farmer',
+      'warehouse-owner': 'warehouse-owner',
+      admin: 'farmer', // do not allow setting admin during signup
+    };
+    const mappedRole = role ? roleMap[role] : 'farmer';
+    const validRoles = ['farmer', 'warehouse-owner'];
+    const userRole = validRoles.includes(mappedRole) ? mappedRole : 'farmer';
+    
     const user = new User({
       firstName,
       lastName,
@@ -71,9 +92,9 @@ exports.register = async (req, res, next) => {
       isVerified: false,
       verificationCode: otpCode,
       verificationCodeExpires: otpExpires,
-      roles: ['farmer'],
-      role: 'farmer',
-      userType: 'farmer',
+      roles: [userRole],
+      role: userRole,
+      userType: userRole,
     });
 
     await user.save();
@@ -552,21 +573,30 @@ exports.resendOTP = async (req, res, next) => {
     user.verificationCodeExpires = otpExpires;
     await user.save();
 
-    // Send new OTP email
+    // Send new OTP email (best-effort)
     try {
       await sendOTPEmail(email, user.firstName, user.lastName, otpCode);
+      return res.json({ 
+        success: true, 
+        message: 'New verification code sent to your email.' 
+      });
     } catch (emailError) {
       console.error('Failed to send OTP email:', emailError);
+      // In non-production, return the OTP to unblock development
+      if ((process.env.NODE_ENV || 'development') !== 'production') {
+        return res.json({
+          success: true,
+          message: 'Email sending failed (dev mode). Use the code shown to verify.',
+          devOtp: otpCode,
+          expiresAt: otpExpires
+        });
+      }
+      // In production, report failure
       return res.status(500).json({ 
         success: false, 
         message: 'Failed to send verification email. Please try again.' 
       });
     }
-
-    return res.json({ 
-      success: true, 
-      message: 'New verification code sent to your email.' 
-    });
   } catch (err) {
     console.error('resendOTP error', err);
     return next(err);

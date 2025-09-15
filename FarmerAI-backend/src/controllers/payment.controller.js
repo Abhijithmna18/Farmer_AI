@@ -1,465 +1,323 @@
-const paymentService = require('../services/payment.service');
-const Order = require('../models/Order');
-const Transaction = require('../models/Transaction');
-const User = require('../models/User');
+// src/controllers/payment.controller.js
+const Payment = require('../models/Payment');
+const Booking = require('../models/Booking');
+const { verifyWebhookSignature, getPaymentDetails } = require('../config/razorpay');
 const logger = require('../utils/logger');
 
-// Create payment order
-exports.createPaymentOrder = async (req, res) => {
+// Get payment history for a user
+const getPaymentHistory = async (req, res) => {
   try {
-    const { orderId, paymentMethod } = req.body;
+    const userId = req.user.id;
+    const { page = 1, limit = 10, status } = req.query;
+
+    const query = { farmer: userId };
+    if (status) query.status = status;
+
+    const payments = await Payment.find(query)
+      .populate('booking', 'bookingId warehouse produce bookingDates')
+      .populate('warehouseOwner', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Payment.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: payments,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching payment history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment history',
+      error: error.message
+    });
+  }
+};
+
+// Get payment by ID
+const getPaymentById = async (req, res) => {
+  try {
+    const { id } = req.params;
     const userId = req.user.id;
 
-    // Validate payment method
-    if (!paymentService.validatePaymentMethod(paymentMethod)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment method'
-      });
-    }
+    const payment = await Payment.findById(id)
+      .populate('booking', 'bookingId warehouse produce bookingDates status')
+      .populate('farmer', 'firstName lastName email phone')
+      .populate('warehouseOwner', 'firstName lastName email phone');
 
-    // Get order details
-    const order = await Order.findById(orderId);
-    if (!order) {
+    if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found'
+        message: 'Payment not found'
       });
     }
 
-    // Check if user owns this order
-    if (order.buyer.toString() !== userId) {
+    // Check if user has permission to view this payment
+    const canView = payment.farmer._id.toString() === userId || 
+                   payment.warehouseOwner._id.toString() === userId ||
+                   req.user.role === 'admin';
+
+    if (!canView) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied'
+        message: 'You do not have permission to view this payment'
       });
     }
 
-    // Check if order is in valid state for payment
-    if (order.status !== 'pending') {
+    res.json({
+      success: true,
+      data: payment
+    });
+  } catch (error) {
+    logger.error('Error fetching payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment',
+      error: error.message
+    });
+  }
+};
+
+// Get payment statistics
+const getPaymentStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { dateFrom, dateTo } = req.query;
+
+    const filters = {};
+    if (userRole === 'farmer') {
+      filters.farmer = userId;
+    } else if (userRole === 'warehouse-owner') {
+      filters.warehouseOwner = userId;
+    }
+
+    if (dateFrom) filters.dateFrom = dateFrom;
+    if (dateTo) filters.dateTo = dateTo;
+
+    const stats = await Payment.getStats(filters);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    logger.error('Error fetching payment stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment statistics',
+      error: error.message
+    });
+  }
+};
+
+// Razorpay webhook handler
+const handleWebhook = async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+    const body = JSON.stringify(req.body);
+
+    // Verify webhook signature
+    const isValid = verifyWebhookSignature(
+      body,
+      signature,
+      process.env.RAZORPAY_WEBHOOK_SECRET
+    );
+
+    if (!isValid) {
+      logger.error('Invalid webhook signature');
       return res.status(400).json({
         success: false,
-        message: 'Order is not in pending state'
+        message: 'Invalid webhook signature'
       });
     }
 
-    // Calculate fees
-    const fees = paymentService.calculatePaymentFees(order.totalAmount, paymentMethod);
+    const event = req.body;
+    logger.info('Received webhook event:', event.event);
 
-    let paymentResult;
-
-    switch (paymentMethod) {
-      case 'razorpay':
-        paymentResult = await paymentService.createRazorpayOrder(
-          order.totalAmount,
-          'INR',
-          order.orderNumber,
-          userId
-        );
+    // Handle different webhook events
+    switch (event.event) {
+      case 'payment.captured':
+        await handlePaymentCaptured(event);
         break;
-      case 'upi':
-        paymentResult = await paymentService.createUPIPaymentLink(
-          order.totalAmount,
-          order.orderNumber,
-          userId
-        );
+      case 'payment.failed':
+        await handlePaymentFailed(event);
         break;
-      case 'cod':
-        paymentResult = await paymentService.processCOD(
-          order.orderNumber,
-          order.totalAmount
-        );
+      case 'refund.created':
+        await handleRefundCreated(event);
+        break;
+      case 'payout.processed':
+        await handlePayoutProcessed(event);
         break;
       default:
-        return res.status(400).json({
-          success: false,
-          message: 'Payment method not supported yet'
-        });
+        logger.info('Unhandled webhook event:', event.event);
     }
 
-    if (!paymentResult.success) {
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to create payment order',
-        error: paymentResult.error
-      });
-    }
-
-    // Create transaction record
-    const transaction = new Transaction({
-      orderNumber: order.orderNumber,
-      buyer: userId,
-      farmer: order.farmer,
-      amount: order.totalAmount,
-      paymentMethod: paymentMethod,
-      status: paymentMethod === 'cod' ? 'pending' : 'processing',
-      gatewayResponse: paymentResult.data,
-      fees: fees
-    });
-
-    await transaction.save();
-
-    // Update order with payment information
-    order.paymentMethod = paymentMethod;
-    order.paymentId = transaction.transactionId;
-    order.paymentStatus = paymentMethod === 'cod' ? 'pending' : 'processing';
-    await order.save();
-
-    res.json({
-      success: true,
-      message: 'Payment order created successfully',
-      data: {
-        transactionId: transaction.transactionId,
-        paymentData: paymentResult.data,
-        fees: fees
-      }
-    });
-
+    res.json({ success: true });
   } catch (error) {
-    logger.error('Error creating payment order:', error);
+    logger.error('Error handling webhook:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create payment order',
+      message: 'Webhook processing failed',
       error: error.message
     });
   }
 };
 
-// Verify payment (for Razorpay)
-exports.verifyPayment = async (req, res) => {
+// Handle payment captured event
+const handlePaymentCaptured = async (event) => {
   try {
-    const { transactionId, paymentData } = req.body;
-    const userId = req.user.id;
+    const paymentData = event.payload.payment.entity;
+    const orderId = paymentData.order_id;
 
-    // Get transaction
-    const transaction = await Transaction.findOne({ 
-      transactionId: transactionId,
-      buyer: userId 
-    });
-
-    if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transaction not found'
-      });
+    // Find payment by order ID
+    const payment = await Payment.findOne({ 'razorpay.orderId': orderId });
+    if (!payment) {
+      logger.error('Payment not found for order:', orderId);
+      return;
     }
 
-    // Verify payment based on method
-    let verificationResult;
+    // Update payment status
+    payment.razorpay.paymentId = paymentData.id;
+    payment.razorpay.status = 'paid';
+    payment.razorpay.method = paymentData.method;
+    payment.razorpay.bank = paymentData.bank;
+    payment.razorpay.wallet = paymentData.wallet;
+    payment.razorpay.vpa = paymentData.vpa;
+    payment.razorpay.cardId = paymentData.card_id;
+    payment.razorpay.international = paymentData.international;
+    payment.razorpay.amountPaid = paymentData.amount / 100; // Convert from paise
+    payment.razorpay.captured = paymentData.captured;
+    payment.razorpay.description = paymentData.description;
+    payment.razorpay.fee = paymentData.fee;
+    payment.razorpay.tax = paymentData.tax;
+    payment.status = 'completed';
 
-    switch (transaction.paymentMethod) {
-      case 'razorpay':
-        verificationResult = await paymentService.verifyRazorpayPayment(paymentData);
-        break;
-      case 'cod':
-        // COD doesn't need verification
-        verificationResult = { success: true, data: { status: 'completed' } };
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          message: 'Payment verification not supported for this method'
-        });
+    await payment.save();
+
+    // Update booking status
+    const booking = await Booking.findById(payment.booking);
+    if (booking) {
+      booking.status = 'awaiting-approval';
+      booking.payment.status = 'paid';
+      booking.payment.razorpayPaymentId = paymentData.id;
+      booking.payment.paidAt = new Date();
+      await booking.save();
     }
 
-    if (!verificationResult.success) {
-      // Update transaction as failed
-      await transaction.updateStatus('failed', {
-        reason: verificationResult.error
-      });
-
-      return res.status(400).json({
-        success: false,
-        message: 'Payment verification failed',
-        error: verificationResult.error
-      });
-    }
-
-    // Update transaction as completed
-    await transaction.updateStatus('completed', {
-      gatewayResponse: verificationResult.data
-    });
-
-    // Update order status
-    const order = await Order.findOne({ orderNumber: transaction.orderNumber });
-    if (order) {
-      order.paymentStatus = 'paid';
-      order.paymentDetails = {
-        transactionId: transaction.transactionId,
-        gatewayResponse: verificationResult.data,
-        paidAt: new Date()
-      };
-      await order.save();
-
-      // Update user statistics
-      await User.findByIdAndUpdate(userId, {
-        $inc: { 'buyerProfile.totalPurchases': order.totalAmount }
-      });
-      await User.findByIdAndUpdate(order.farmer, {
-        $inc: { 'farmerProfile.totalSales': order.totalAmount }
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Payment verified successfully',
-      data: {
-        transactionId: transaction.transactionId,
-        orderNumber: order.orderNumber,
-        amount: transaction.amount,
-        status: 'completed'
-      }
-    });
-
+    logger.info('Payment captured successfully:', paymentData.id);
   } catch (error) {
-    logger.error('Error verifying payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify payment',
-      error: error.message
-    });
+    logger.error('Error handling payment captured:', error);
   }
 };
 
-// Get payment status
-exports.getPaymentStatus = async (req, res) => {
+// Handle payment failed event
+const handlePaymentFailed = async (event) => {
   try {
-    const { transactionId } = req.params;
-    const userId = req.user.id;
+    const paymentData = event.payload.payment.entity;
+    const orderId = paymentData.order_id;
 
-    const transaction = await Transaction.findOne({ 
-      transactionId: transactionId,
-      $or: [{ buyer: userId }, { farmer: userId }]
-    });
-
-    if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transaction not found'
-      });
+    // Find payment by order ID
+    const payment = await Payment.findOne({ 'razorpay.orderId': orderId });
+    if (!payment) {
+      logger.error('Payment not found for order:', orderId);
+      return;
     }
 
-    // Get latest payment details from gateway if needed
-    let paymentDetails = null;
-    if (transaction.paymentMethod === 'razorpay' && transaction.gatewayResponse?.paymentId) {
-      const details = await paymentService.getPaymentDetails(transaction.gatewayResponse.paymentId);
-      if (details.success) {
-        paymentDetails = details.data;
-      }
+    // Update payment status
+    payment.razorpay.status = 'failed';
+    payment.razorpay.errorCode = paymentData.error_code;
+    payment.razorpay.errorDescription = paymentData.error_description;
+    payment.status = 'failed';
+
+    await payment.save();
+
+    // Update booking status
+    const booking = await Booking.findById(payment.booking);
+    if (booking) {
+      booking.status = 'pending';
+      booking.payment.status = 'failed';
+      await booking.save();
     }
 
-    res.json({
-      success: true,
-      data: {
-        transactionId: transaction.transactionId,
-        orderNumber: transaction.orderNumber,
-        amount: transaction.amount,
-        status: transaction.status,
-        paymentMethod: transaction.paymentMethod,
-        fees: transaction.fees,
-        paymentDetails: paymentDetails,
-        createdAt: transaction.createdAt,
-        completedAt: transaction.completedAt
-      }
-    });
-
+    logger.info('Payment failed:', paymentData.id);
   } catch (error) {
-    logger.error('Error getting payment status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get payment status',
-      error: error.message
-    });
+    logger.error('Error handling payment failed:', error);
   }
 };
 
-// Process refund
-exports.processRefund = async (req, res) => {
+// Handle refund created event
+const handleRefundCreated = async (event) => {
   try {
-    const { transactionId } = req.params;
-    const { amount, reason } = req.body;
-    const userId = req.user.id;
+    const refundData = event.payload.refund.entity;
+    const paymentId = refundData.payment_id;
 
-    const transaction = await Transaction.findOne({ 
-      transactionId: transactionId,
-      farmer: userId // Only farmers can process refunds
-    });
-
-    if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transaction not found'
-      });
+    // Find payment by payment ID
+    const payment = await Payment.findOne({ 'razorpay.paymentId': paymentId });
+    if (!payment) {
+      logger.error('Payment not found for refund:', paymentId);
+      return;
     }
 
-    if (transaction.status !== 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: 'Can only refund completed transactions'
-      });
-    }
+    // Update refund status
+    payment.refund.razorpayRefundId = refundData.id;
+    payment.refund.amount = refundData.amount / 100; // Convert from paise
+    payment.refund.status = 'processed';
+    payment.refund.processedAt = new Date();
+    payment.amount.amountRefunded = refundData.amount / 100;
+    payment.razorpay.amountRefunded = refundData.amount / 100;
 
-    if (amount > transaction.amount) {
-      return res.status(400).json({
-        success: false,
-        message: 'Refund amount cannot exceed transaction amount'
-      });
-    }
-
-    let refundResult;
-
-    switch (transaction.paymentMethod) {
-      case 'razorpay':
-        if (!transaction.gatewayResponse?.paymentId) {
-          return res.status(400).json({
-            success: false,
-            message: 'Payment ID not found for refund'
-          });
-        }
-        refundResult = await paymentService.refundPayment(
-          transaction.gatewayResponse.paymentId,
-          amount,
-          reason
-        );
-        break;
-      case 'cod':
-        // For COD, we just mark as refunded
-        refundResult = { 
-          success: true, 
-          data: { 
-            refundId: `COD_REFUND_${transactionId}_${Date.now()}`,
-            status: 'completed'
-          } 
-        };
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          message: 'Refund not supported for this payment method'
-        });
-    }
-
-    if (!refundResult.success) {
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to process refund',
-        error: refundResult.error
-      });
-    }
-
-    // Update transaction with refund information
-    await transaction.processRefund(amount, reason, refundResult.data.refundId);
-
-    // Update order status
-    const order = await Order.findOne({ orderNumber: transaction.orderNumber });
-    if (order) {
-      order.refund = {
-        amount: amount,
-        reason: reason,
-        status: 'processed',
-        processedAt: new Date()
-      };
-      order.status = amount === transaction.amount ? 'refunded' : 'partially_refunded';
-      await order.save();
-    }
-
-    res.json({
-      success: true,
-      message: 'Refund processed successfully',
-      data: {
-        refundId: refundResult.data.refundId,
-        amount: amount,
-        status: 'processed'
-      }
-    });
-
-  } catch (error) {
-    logger.error('Error processing refund:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process refund',
-      error: error.message
-    });
-  }
-};
-
-// Get user's transactions
-exports.getUserTransactions = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { page = 1, limit = 20, status, userType = 'buyer' } = req.query;
-
-    const filter = {};
-    if (userType === 'buyer') {
-      filter.buyer = userId;
-    } else if (userType === 'farmer') {
-      filter.farmer = userId;
+    if (refundData.amount === payment.amount.total * 100) {
+      payment.refund.status = 'full';
+      payment.status = 'refunded';
     } else {
-      filter.$or = [{ buyer: userId }, { farmer: userId }];
+      payment.refund.status = 'partial';
     }
 
-    if (status) {
-      filter.status = status;
-    }
+    await payment.save();
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const transactions = await Transaction.find(filter)
-      .populate([
-        { path: 'buyer', select: 'name email' },
-        { path: 'farmer', select: 'name email farmerProfile.farmName' }
-      ])
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Transaction.countDocuments(filter);
-
-    res.json({
-      success: true,
-      data: {
-        transactions,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalTransactions: total
-        }
-      }
-    });
-
+    logger.info('Refund processed successfully:', refundData.id);
   } catch (error) {
-    logger.error('Error fetching user transactions:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch transactions',
-      error: error.message
-    });
+    logger.error('Error handling refund created:', error);
   }
 };
 
-// Get transaction statistics
-exports.getTransactionStats = async (req, res) => {
+// Handle payout processed event
+const handlePayoutProcessed = async (event) => {
   try {
-    const userId = req.user.id;
-    const { period = 'month' } = req.query;
+    const payoutData = event.payload.payout.entity;
+    const payoutId = payoutData.id;
 
-    const buyerStats = await Transaction.getTransactionStats(userId, 'buyer', period);
-    const farmerStats = await Transaction.getTransactionStats(userId, 'farmer', period);
+    // Find payment by payout ID
+    const payment = await Payment.findOne({ 'payout.razorpayPayoutId': payoutId });
+    if (!payment) {
+      logger.error('Payment not found for payout:', payoutId);
+      return;
+    }
 
-    res.json({
-      success: true,
-      data: {
-        buyer: buyerStats,
-        farmer: farmerStats
-      }
-    });
+    // Update payout status
+    payment.payout.status = 'completed';
+    payment.payout.processedAt = new Date();
 
+    await payment.save();
+
+    logger.info('Payout processed successfully:', payoutId);
   } catch (error) {
-    logger.error('Error fetching transaction stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch transaction statistics',
-      error: error.message
-    });
+    logger.error('Error handling payout processed:', error);
   }
+};
+
+module.exports = {
+  getPaymentHistory,
+  getPaymentById,
+  getPaymentStats,
+  handleWebhook
 };

@@ -11,7 +11,7 @@ const emailLogSchema = new mongoose.Schema({
   },
   body: {
     type: String,
-    required: true,
+    required: false,
   },
   status: {
     type: String,

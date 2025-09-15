@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import LogoutButton from "./LogoutButton";
 import ThemeToggle from "./ThemeToggle";
-import { Home, Sprout, BarChart2, User, Settings, MessageSquare } from "lucide-react";
+import { Home, Sprout, BarChart2, User, Settings, MessageSquare, MessageCircle, Warehouse } from "lucide-react";
 
 export default function TabNav({ isOpen, onToggle }) {
 	const { user, loading } = useAuth();
@@ -12,7 +12,9 @@ export default function TabNav({ isOpen, onToggle }) {
 		{ label: "Dashboard", to: "/dashboard", Icon: Home },
 		{ label: "Assistant", to: "/assistant", Icon: MessageSquare },
 		{ label: "Recommendations", to: "/recommendations", Icon: Sprout },
+		{ label: "Warehouse", to: "/warehouse", Icon: Warehouse },
 		{ label: "Reports", to: "/reports", Icon: BarChart2 },
+		{ label: "Feedback", to: "/feedback", Icon: MessageCircle },
 		{ label: "Profile", to: "/profile", Icon: User },
 		{ label: "Settings", to: "/settings", Icon: Settings }
 	];

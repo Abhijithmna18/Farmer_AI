@@ -433,6 +433,18 @@ export default function Dashboard() {
               description: "Clear analysis and actionable tips to nourish your land.",
               color: "bg-gradient-to-br from-emerald-50 to-emerald-100",
               accent: "text-emerald-600",
+            },
+            {
+              id: 4,
+              title: "Warehouses",
+              icon: "🏬",
+              description: "Discover and manage storage options in your area.",
+              color: "bg-gradient-to-br from-gray-50 to-gray-100",
+              accent: "text-gray-700",
+              cta: {
+                label: 'Browse Warehouses',
+                onClick: () => navigate('/warehouse')
+              }
             }
           ].map((feature, index) => (
             <div
@@ -451,12 +463,14 @@ export default function Dashboard() {
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{feature.title}</h3>
                 <p className="text-gray-700 mb-4">{feature.description}</p>
                 {feature.cta ? (
-                  <button onClick={feature.cta.onClick} className={`${feature.accent} font-medium hover:underline flex items-center group-hover:translate-x-1 transition-transform duration-200`}>
-                    {feature.cta.label}
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={feature.cta.onClick} className={`${feature.accent} font-medium hover:underline flex items-center group-hover:translate-x-1 transition-transform duration-200`}>
+                      {feature.cta.label}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
                 ) : (
                   <button className={`${feature.accent} font-medium hover:underline flex items-center group-hover:translate-x-1 transition-transform duration-200`}>
                     View details

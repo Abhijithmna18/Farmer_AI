@@ -1,5 +1,5 @@
 // src/services/otp.service.js
-const { sendEmail } = require('./email.service');
+const { sendRawEmail } = require('./email.service');
 
 /**
  * Generate a random 6-digit OTP
@@ -66,7 +66,7 @@ async function sendOTPEmail(email, firstName, lastName, otpCode) {
     </div>
   `;
   
-  return sendEmail(email, subject, html);
+  return sendRawEmail(email, subject, html);
 }
 
 /**
@@ -105,6 +105,13 @@ module.exports = {
   isOTPValid,
   clearOTP
 };
+
+
+
+
+
+
+
 
 
 

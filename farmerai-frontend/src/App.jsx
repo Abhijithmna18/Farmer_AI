@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { BookingCartProvider } from "./context/BookingCartContext";
 import Welcome from "./pages/Welcome";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
@@ -29,13 +30,16 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import SearchResults from "./pages/SearchResults";
 import AdminRouter from "./pages/AdminRouter";
 import PlantExplorer from "./pages/PlantExplorer";
+import Feedback from "./pages/Feedback";
+import WarehouseModule from "./pages/WarehouseModule";
 
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        {/* Floating Chatbot visible on all pages */}
-        <Chatbot />
+        <BookingCartProvider>
+          {/* Floating Chatbot visible on all pages */}
+          <Chatbot />
         <Routes>
           <Route path="/" element={<Welcome />} />
           <Route path="/blog" element={<Blog />} />
@@ -62,6 +66,8 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
               <Route path="plants" element={<PlantExplorer />} />
+              <Route path="feedback" element={<Feedback />} />
+              <Route path="warehouse" element={<WarehouseModule />} />
             </Route>
           </Route>
           {/* Admin Protected Route */}
@@ -70,6 +76,7 @@ function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        </BookingCartProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -1,24 +1,54 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { AuthContext } from '../../../context/AuthContext';
 import { firebaseSignOut } from '../../../services/authService';
+import apiClient from '../../../services/apiClient';
 
 const navItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: '🏠' },
   { label: 'Users', to: '/admin/dashboard/users', icon: '👥' },
+  { label: 'Community Requests', to: '/admin/community-requests', icon: '🤝', badge: 'community-requests' },
+  { label: 'Feedback', to: '/admin/feedback', icon: '💬', badge: 'feedback' },
   { label: 'Products', to: '/admin/dashboard/products', icon: '🧺' },
   { label: 'Events', to: '/admin/dashboard/events', icon: '📅' },
   { label: 'Growth Calendar', to: '/admin/dashboard/calendar', icon: '🌱' },
+  { label: 'Warehouse', to: '/admin/warehouse', icon: '🏪' },
   { label: 'Contact Messages', to: '/admin/dashboard/contacts', icon: '✉️' },
   { label: 'Settings', to: '/admin/dashboard/settings', icon: '⚙️' },
 ];
 
 export default function AdminLayout() {
   const [open, setOpen] = useState(true);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+
+  // Load pending counts
+  useEffect(() => {
+    const loadPendingCounts = async () => {
+      try {
+        // Load community requests count
+        const requestsResponse = await apiClient.get('/community/admin/community-requests?status=pending&limit=1');
+        setPendingRequestsCount(requestsResponse.data.counts?.pending || 0);
+
+        // Load feedback count
+        const feedbackResponse = await apiClient.get('/feedback/admin/all?status=Received&limit=1');
+        setPendingFeedbackCount(feedbackResponse.data.counts?.received || 0);
+      } catch (error) {
+        console.error('Error loading pending counts:', error);
+        // Don't show error to user, just set counts to 0
+        setPendingRequestsCount(0);
+        setPendingFeedbackCount(0);
+      }
+    };
+
+    if (user && user.role === 'admin') {
+      loadPendingCounts();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -60,7 +90,17 @@ export default function AdminLayout() {
             {navItems.map(n => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 text-sm border-b last:border-0 ${isActive ? 'bg-emerald-50 text-emerald-700 font-medium' : 'hover:bg-slate-50'}`}>
                 <span>{n.icon}</span>
-                {n.label}
+                <span className="flex-1">{n.label}</span>
+                {n.badge === 'community-requests' && pendingRequestsCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    {pendingRequestsCount}
+                  </span>
+                )}
+                {n.badge === 'feedback' && pendingFeedbackCount > 0 && (
+                  <span className="bg-orange-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    {pendingFeedbackCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>
