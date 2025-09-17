@@ -1,13 +1,14 @@
 // src/components/WarehouseCard.jsx
-import React, { useRef, useEffect } from 'react';
-import { MapPinIcon, StarIcon, CalendarIcon, CurrencyRupeeIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
-import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
+import React, { useRef, useEffect, useState } from 'react';
+import { MapPinIcon, StarIcon, CalendarIcon, CurrencyRupeeIcon, ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { StarIcon as StarSolidIcon, HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { gsap } from 'gsap';
 import { useBookingCart } from '../context/BookingCartContext';
 
 const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
   const cardRef = useRef(null);
   const { addToCart } = useBookingCart();
+  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     // Animate card on mount
@@ -70,6 +71,20 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
     });
   };
 
+  const handleToggleFavorite = (e) => {
+    e.stopPropagation();
+    setIsFavorited(!isFavorited);
+    
+    // Animate the heart icon
+    gsap.to(e.currentTarget, {
+      scale: 1.2,
+      duration: 0.2,
+      yoyo: true,
+      repeat: 1,
+      ease: 'power2.inOut'
+    });
+  };
+
   const renderStars = (rating) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -117,7 +132,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
   return (
     <div
       ref={cardRef}
-      className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300"
+      className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
     >
       {/* Image */}
       <div className="relative h-48 bg-gradient-to-br from-green-400 to-green-600 overflow-hidden">
@@ -137,7 +152,18 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
         )}
         
         {/* Status Badge */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            onClick={handleToggleFavorite}
+            className="p-2 bg-white bg-opacity-90 rounded-full hover:bg-opacity-100 transition-all duration-200"
+            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            {isFavorited ? (
+              <HeartSolidIcon className="h-5 w-5 text-red-500" />
+            ) : (
+              <HeartIcon className="h-5 w-5 text-gray-600" />
+            )}
+          </button>
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
             warehouse.status === 'active' 
               ? 'bg-green-100 text-green-800' 
@@ -204,20 +230,30 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
         </div>
 
         {/* Capacity and Pricing */}
-        <div className="mb-4 space-y-2">
+        <div className="mb-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Capacity:</span>
-            <span className="font-medium">
+            <span className="text-gray-600">Available Capacity:</span>
+            <span className="font-semibold text-gray-900">
               {warehouse.capacity.available} {warehouse.capacity.unit}
             </span>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Price:</span>
-            <span className="font-medium text-green-600 flex items-center">
-              <CurrencyRupeeIcon className="h-4 w-4 mr-1" />
-              {warehouse.pricing.basePrice}
-              {warehouse.pricing.pricePerUnit === 'per_ton' ? '/ton' : '/day'}
-            </span>
+          <div className="bg-green-50 rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600">Starting from</div>
+                <div className="text-lg font-bold text-green-600 flex items-center">
+                  <CurrencyRupeeIcon className="h-5 w-5 mr-1" />
+                  {warehouse.pricing.basePrice}
+                  <span className="text-sm font-normal text-gray-500 ml-1">/day</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-gray-500">Per ton</div>
+                <div className="text-sm font-medium text-gray-700">
+                  {warehouse.pricing.minimumDays || 1} day min
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -259,27 +295,47 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={handleViewDetails}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm"
-          >
-            View Details
-          </button>
-          <button
-            onClick={handleAddToCart}
-            disabled={warehouse.status !== 'active'}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
-            title="Add to Cart"
-          >
-            <ShoppingCartIcon className="h-4 w-4" />
-          </button>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <button
+              onClick={handleViewDetails}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Details
+            </button>
+            <button
+              onClick={handleAddToCart}
+              disabled={warehouse.status !== 'active'}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center"
+              title="Add to Cart"
+            >
+              <ShoppingCartIcon className="h-4 w-4" />
+            </button>
+          </div>
           <button
             onClick={handleBookClick}
             disabled={warehouse.status !== 'active'}
-            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
+            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
           >
-            Book Now
+            {warehouse.status !== 'active' ? (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Not Available
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Rent This Space
+              </>
+            )}
           </button>
         </div>
       </div>

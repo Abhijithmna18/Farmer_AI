@@ -10,6 +10,7 @@ const Warehouse = require('../models/Warehouse');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const { createRefund } = require('../config/razorpay');
+const logger = require('../utils/logger');
 
 // Overview Statistics
 exports.getOverviewStats = async (req, res) => {
@@ -459,6 +460,50 @@ exports.getWarehouses = async (req, res) => {
   }
 };
 
+// Create warehouse (admin on behalf of owner)
+exports.createWarehouse = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    if (!payload.owner) {
+      return res.status(400).json({ success: false, message: 'owner is required' });
+    }
+
+    const owner = await User.findById(payload.owner);
+    if (!owner) {
+      return res.status(404).json({ success: false, message: 'Owner not found' });
+    }
+
+    const warehouse = new Warehouse({
+      ...payload,
+      owner: owner._id,
+      status: payload.status || 'active',
+      verification: payload.verification || { status: 'verified', verifiedAt: new Date(), verifiedBy: req.user._id }
+    });
+    await warehouse.save();
+    await warehouse.populate('owner', 'firstName lastName email phone');
+    return res.status(201).json({ success: true, data: warehouse });
+  } catch (error) {
+    logger.error('Admin create warehouse failed:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create warehouse', error: error.message });
+  }
+};
+
+// Update warehouse (admin)
+exports.updateWarehouse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await Warehouse.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
+      .populate('owner', 'firstName lastName email phone');
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    }
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    logger.error('Admin update warehouse failed:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update warehouse', error: error.message });
+  }
+};
+
 exports.getWarehouseById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -614,6 +659,53 @@ exports.getBookingById = async (req, res) => {
   } catch (error) {
     console.error('Error fetching booking:', error);
     res.status(500).json({ message: 'Failed to fetch booking.' });
+  }
+};
+
+// Create booking (admin on behalf of farmer)
+exports.createBooking = async (req, res) => {
+  try {
+    const { farmerId, warehouseId, produceType, quantity, startDate, endDate, markPaid } = req.body || {};
+    if (!farmerId || !warehouseId || !produceType || !quantity || !startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const farmer = await User.findById(farmerId);
+    const warehouse = await Warehouse.findById(warehouseId).populate('owner', 'firstName lastName email phone');
+    if (!farmer || !warehouse) {
+      return res.status(404).json({ success: false, message: 'Farmer or warehouse not found' });
+    }
+
+    const duration = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
+    const basePrice = warehouse.pricing?.basePrice || 0;
+    const totalAmount = basePrice * duration * Number(quantity);
+    const platformFee = totalAmount * 0.05;
+    const ownerAmount = totalAmount - platformFee;
+
+    const booking = new Booking({
+      bookingId: Booking.generateBookingId(),
+      farmer: farmer._id,
+      warehouse: warehouse._id,
+      warehouseOwner: warehouse.owner._id || warehouse.owner,
+      produce: { type: produceType, quantity: Number(quantity), unit: 'tons' },
+      storageRequirements: { storageType: warehouse.storageTypes?.[0] || 'general' },
+      bookingDates: { startDate, endDate, duration },
+      pricing: { basePrice, totalAmount, currency: 'INR', platformFee, ownerAmount },
+      status: markPaid ? 'approved' : 'pending',
+      payment: { status: markPaid ? 'paid' : 'pending', paidAt: markPaid ? new Date() : undefined }
+    });
+
+    await booking.save();
+    await booking.populate([
+      { path: 'farmer', select: 'firstName lastName email phone' },
+      { path: 'warehouse', select: 'name location' },
+      { path: 'warehouseOwner', select: 'firstName lastName email phone' }
+    ]);
+
+    return res.status(201).json({ success: true, data: booking });
+  } catch (error) {
+    logger.error('Admin create booking failed:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create booking', error: error.message });
   }
 };
 

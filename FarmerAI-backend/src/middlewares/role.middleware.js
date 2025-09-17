@@ -14,7 +14,11 @@ const authorizeRoles = (roles) => {
 
       const userRolesArray = Array.isArray(user.roles) ? user.roles : [];
       const userSingleRole = user.role;
-      const hasRequiredRole = roles.some(role => userRolesArray.includes(role) || userSingleRole === role);
+      const userType = user.userType;
+      const isAdmin = userSingleRole === 'admin' || userRolesArray.includes('admin');
+      const hasRequiredRole = isAdmin || roles.some(role =>
+        userRolesArray.includes(role) || userSingleRole === role || userType === role
+      );
 
       if (!hasRequiredRole) {
         return res.status(403).json({ message: 'Access denied. Insufficient role.' });

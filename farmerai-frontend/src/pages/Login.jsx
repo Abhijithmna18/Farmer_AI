@@ -215,9 +215,18 @@ export default function Login() {
       const { token } = response.data;
       const role = response?.data?.user?.role || response?.data?.role;
       const email = response?.data?.user?.email || form.email;
+      const roles = response?.data?.user?.roles;
+      const userType = response?.data?.user?.userType;
+      
+      console.log('Login response data:', response.data);
+      console.log('Detected role:', role);
+      console.log('Detected userType:', userType);
+      console.log('Detected roles:', roles);
       if (isLocalStorageAvailable()) {
         localStorage.setItem('token', token);
         if (role) localStorage.setItem('role', role);
+        if (roles && Array.isArray(roles)) localStorage.setItem('roles', JSON.stringify(roles));
+        if (userType) localStorage.setItem('userType', userType);
         if (email) localStorage.setItem('email', email);
         
         // Store user ID for proper data filtering
@@ -226,7 +235,7 @@ export default function Login() {
           localStorage.setItem('userId', userId);
         }
         
-        setUser && setUser(response?.data?.user || { email, role, id: userId });
+        setUser && setUser(response?.data?.user || { email, role, roles, userType, id: userId });
         
         setToast({ 
           message: "Login successful! Redirecting...", 
@@ -234,10 +243,16 @@ export default function Login() {
         });
         
         setTimeout(() => {
+          console.log('Redirecting based on role:', role);
           if (role === 'admin') {
+            console.log('Redirecting to admin dashboard');
             nav('/admin/dashboard');
+          } else if (role === 'warehouse-owner') {
+            console.log('Redirecting to owner dashboard');
+            nav('/owner/dashboard');
           } else {
-            nav(redirectTo);
+            console.log('Redirecting to user dashboard');
+            nav('/dashboard');
           }
         }, 800);
       } else {

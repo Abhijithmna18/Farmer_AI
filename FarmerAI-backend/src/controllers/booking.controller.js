@@ -8,9 +8,153 @@ const {
   sendPaymentConfirmation,
   sendBookingApproved,
   sendBookingRejected,
-  sendRefundProcessed
+  sendRefundProcessed,
+  sendBookingConfirmationToAdmin,
+  sendBookingConfirmationToOwner
 } = require('../services/email.service');
 const logger = require('../utils/logger');
+
+// Create a new booking
+const createBooking = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      warehouseId,
+      produceType,
+      quantity,
+      startDate,
+      endDate,
+      notes,
+      duration
+    } = req.body;
+
+    // Validate required fields
+    if (!warehouseId || !produceType || !quantity || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: warehouseId, produceType, quantity, startDate, endDate'
+      });
+    }
+
+    // Get warehouse details
+    const warehouse = await Warehouse.findById(warehouseId)
+      .populate('owner', 'firstName lastName email phone');
+
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warehouse not found'
+      });
+    }
+
+    // Check if warehouse is active
+    if (warehouse.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Warehouse is not available for booking'
+      });
+    }
+
+    // Calculate duration if not provided
+    const calculatedDuration = duration || Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
+    
+    // Calculate pricing
+    const basePrice = warehouse.pricing?.basePrice || 0;
+    const totalAmount = basePrice * calculatedDuration * quantity;
+    const platformFee = totalAmount * 0.05; // 5% platform fee
+    const ownerAmount = totalAmount - platformFee;
+
+    // Create booking
+    const booking = new Booking({
+      bookingId: Booking.generateBookingId(),
+      farmer: userId,
+      warehouse: warehouseId,
+      warehouseOwner: warehouse.owner._id,
+      produce: {
+        type: produceType,
+        quantity: parseFloat(quantity),
+        unit: 'tons',
+        quality: 'good',
+        description: notes || ''
+      },
+      storageRequirements: {
+        storageType: warehouse.storageTypes?.[0] || 'general'
+      },
+      bookingDates: {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        duration: calculatedDuration
+      },
+      pricing: {
+        basePrice,
+        totalAmount,
+        currency: 'INR',
+        platformFee,
+        ownerAmount
+      },
+      status: 'pending'
+    });
+
+    await booking.save();
+
+    // Populate the booking for response
+    await booking.populate([
+      { path: 'farmer', select: 'firstName lastName email phone' },
+      { path: 'warehouse', select: 'name location' },
+      { path: 'warehouseOwner', select: 'firstName lastName email phone' }
+    ]);
+
+    // Send email notifications
+    try {
+      // Get admin email
+      const admin = await User.findOne({ role: 'admin' });
+      const adminEmail = admin?.email || 'admin@farmerai.com';
+
+      // Prepare booking data for emails
+      const bookingData = {
+        bookingId: booking.bookingId,
+        farmerName: `${booking.farmer.firstName} ${booking.farmer.lastName}`,
+        farmerEmail: booking.farmer.email,
+        farmerPhone: booking.farmer.phone,
+        warehouseName: booking.warehouse.name,
+        warehouseLocation: `${booking.warehouse.location.city}, ${booking.warehouse.location.state}`,
+        ownerName: `${booking.warehouseOwner.firstName} ${booking.warehouseOwner.lastName}`,
+        produceType: booking.produce.type,
+        quantity: booking.produce.quantity,
+        unit: booking.produce.unit,
+        startDate: booking.bookingDates.startDate.toLocaleDateString('en-IN'),
+        endDate: booking.bookingDates.endDate.toLocaleDateString('en-IN'),
+        totalAmount: booking.pricing.totalAmount,
+        paymentStatus: booking.payment.status,
+        notes: booking.produce.description
+      };
+
+      // Send email to admin
+      await sendBookingConfirmationToAdmin(adminEmail, bookingData);
+
+      // Send email to warehouse owner
+      await sendBookingConfirmationToOwner(booking.warehouseOwner.email, bookingData);
+
+      logger.info(`Email notifications sent for booking ${booking.bookingId}`);
+    } catch (emailError) {
+      logger.error('Failed to send booking confirmation emails:', emailError);
+      // Don't fail the booking creation if email fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking created successfully',
+      data: booking
+    });
+  } catch (error) {
+    logger.error('Error creating booking:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create booking',
+      error: error.message
+    });
+  }
+};
 
 // Get all bookings for a user (farmer or warehouse owner)
 const getBookings = async (req, res) => {
@@ -492,12 +636,202 @@ const getBookingStats = async (req, res) => {
   }
 };
 
+// Revenue summary for owner
+const getOwnerRevenue = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { range = '30d' } = req.query;
+    const now = new Date();
+    const start = range === '7d' ? new Date(now - 7 * 24 * 60 * 60 * 1000)
+               : range === '90d' ? new Date(now - 90 * 24 * 60 * 60 * 1000)
+               : new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const pipeline = [
+      { $match: { warehouseOwner: req.user._id || userId, createdAt: { $gte: start } } },
+      { $group: {
+          _id: null,
+          totalEarnings: { $sum: '$pricing.ownerAmount' },
+          count: { $sum: 1 }
+        }
+      }
+    ];
+
+    const [agg] = await Booking.aggregate(pipeline);
+
+    return res.json({
+      success: true,
+      data: {
+        totalEarnings: agg?.totalEarnings || 0,
+        totalBookings: agg?.count || 0,
+        range
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching owner revenue:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch revenue', error: error.message });
+  }
+};
+
+// Refund booking payment (owner only)
+const refundBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { amount, reason = 'Refund requested by owner' } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.warehouseOwner.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to refund this booking' });
+    }
+
+    if (!booking.payment || !booking.payment.razorpayPaymentId) {
+      return res.status(400).json({ success: false, message: 'No captured payment to refund' });
+    }
+
+    const refundAmount = Number.isFinite(amount) ? amount : booking.pricing.totalAmount;
+
+    try {
+      await createRefund(
+        booking.payment.razorpayPaymentId,
+        refundAmount,
+        { reason }
+      );
+
+      booking.payment.status = 'refunded';
+      booking.payment.refundedAt = new Date();
+      booking.payment.refundAmount = refundAmount;
+      booking.payment.refundReason = reason;
+      await booking.save();
+
+      return res.json({ success: true, message: 'Refund initiated', data: { bookingId: booking._id, refundAmount } });
+    } catch (err) {
+      logger.error('Refund initiation failed:', err);
+      return res.status(500).json({ success: false, message: 'Failed to initiate refund', error: err.message });
+    }
+  } catch (error) {
+    logger.error('Error refunding booking:', error);
+    return res.status(500).json({ success: false, message: 'Failed to refund booking', error: error.message });
+  }
+};
+
+// Owner revenue timeseries (daily/weekly/monthly)
+const getOwnerRevenueTimeseries = async (req, res) => {
+  try {
+    const ownerId = req.user._id || req.user.id;
+    const { granularity = 'daily', days = 30 } = req.query;
+
+    const now = new Date();
+    const start = new Date(now.getTime() - Math.max(1, parseInt(days)) * 24 * 60 * 60 * 1000);
+
+    // Group date trunc expression
+    const dateFormat = granularity === 'weekly' ? '%G-%V' : (granularity === 'monthly' ? '%Y-%m' : '%Y-%m-%d');
+
+    const pipeline = [
+      { $match: { warehouseOwner: ownerId, 'payment.status': 'paid', createdAt: { $gte: start } } },
+      { $group: {
+          _id: { $dateToString: { date: '$createdAt', format: dateFormat } },
+          earnings: { $sum: '$pricing.ownerAmount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ];
+
+    const points = await Booking.aggregate(pipeline);
+    return res.json({ success: true, data: points, meta: { granularity, from: start, to: now } });
+  } catch (error) {
+    logger.error('Error fetching revenue timeseries:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch revenue timeseries', error: error.message });
+  }
+};
+
+// Owner analytics: booking/revenue trends
+const getOwnerAnalyticsTrends = async (req, res) => {
+  try {
+    const ownerId = req.user._id || req.user.id;
+    const { days = 30 } = req.query;
+    const now = new Date();
+    const start = new Date(now.getTime() - Math.max(1, parseInt(days)) * 24 * 60 * 60 * 1000);
+
+    const pipeline = [
+      { $match: { warehouseOwner: ownerId, createdAt: { $gte: start } } },
+      { $group: {
+          _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d' } },
+          bookings: { $sum: 1 },
+          revenue: { $sum: { $cond: [{ $eq: ['$payment.status', 'paid'] }, '$pricing.ownerAmount', 0] } }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ];
+
+    const points = await Booking.aggregate(pipeline);
+    return res.json({ success: true, data: points, meta: { from: start, to: now } });
+  } catch (error) {
+    logger.error('Error fetching owner trends:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch trends', error: error.message });
+  }
+};
+
+// Owner analytics: occupancy calendar for a given month
+const getOwnerOccupancyCalendar = async (req, res) => {
+  try {
+    const ownerId = req.user._id || req.user.id;
+    const { year, month } = req.query; // month: 1-12
+
+    const y = parseInt(year) || new Date().getFullYear();
+    const m = parseInt(month) ? parseInt(month) - 1 : new Date().getMonth();
+    const monthStart = new Date(Date.UTC(y, m, 1, 0, 0, 0));
+    const monthEnd = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59));
+
+    // Find bookings overlapping the month
+    const bookings = await Booking.find({
+      warehouseOwner: ownerId,
+      'bookingDates.startDate': { $lte: monthEnd },
+      'bookingDates.endDate': { $gte: monthStart },
+      status: { $in: ['paid', 'awaiting-approval', 'approved', 'completed'] }
+    }).select('bookingDates warehouse').lean();
+
+    // Build daily occupancy counts
+    const daysInMonth = new Date(y, m + 1, 0).getUTCDate();
+    const daily = Array.from({ length: daysInMonth }, (_, i) => ({
+      date: new Date(Date.UTC(y, m, i + 1)).toISOString().slice(0, 10),
+      bookings: 0
+    }));
+
+    bookings.forEach(b => {
+      const start = new Date(b.bookingDates.startDate);
+      const end = new Date(b.bookingDates.endDate);
+      for (let d = 1; d <= daysInMonth; d++) {
+        const day = new Date(Date.UTC(y, m, d));
+        if (day >= start && day <= end) {
+          daily[d - 1].bookings += 1;
+        }
+      }
+    });
+
+    return res.json({ success: true, data: daily, meta: { year: y, month: m + 1 } });
+  } catch (error) {
+    logger.error('Error fetching occupancy calendar:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch occupancy calendar', error: error.message });
+  }
+};
+
 module.exports = {
+  createBooking,
   getBookings,
   getBookingById,
   verifyPayment,
   approveBooking,
   rejectBooking,
   cancelBooking,
-  getBookingStats
+  refundBooking,
+  getBookingStats,
+  getOwnerRevenue,
+  getOwnerRevenueTimeseries,
+  getOwnerAnalyticsTrends,
+  getOwnerOccupancyCalendar
 };

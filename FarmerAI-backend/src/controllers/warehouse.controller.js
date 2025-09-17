@@ -323,9 +323,16 @@ const createWarehouse = async (req, res) => {
     ]);
 
     const address = payload.address || {};
-    const coords = address.coordinates || {};
-    const lat = parseFloat(coords.latitude);
-    const lng = parseFloat(coords.longitude);
+    const coordinatesInput = address.coordinates || payload.coordinates || {};
+    let lng = undefined;
+    let lat = undefined;
+    if (Array.isArray(coordinatesInput?.coordinates) && coordinatesInput.coordinates.length === 2) {
+      lng = parseFloat(coordinatesInput.coordinates[0]);
+      lat = parseFloat(coordinatesInput.coordinates[1]);
+    } else {
+      lat = parseFloat(coordinatesInput.latitude ?? payload.latitude);
+      lng = parseFloat(coordinatesInput.longitude ?? payload.longitude);
+    }
     const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 
     const totalCapacity = Number(payload?.capacity?.total);
@@ -334,12 +341,13 @@ const createWarehouse = async (req, res) => {
     const pricePerDay = payload.pricePerDay != null && payload.pricePerDay !== '' ? Number(payload.pricePerDay) : null;
     const pricePerTon = payload.pricePerTon != null && payload.pricePerTon !== '' ? Number(payload.pricePerTon) : null;
 
+    const streetOrAddress = address.address || address.street || payload.addressLine || payload.street || payload.locationAddress;
     const mapped = {
       name: payload.name,
       description: payload.description,
       owner: userId,
       location: {
-        address: address.street,
+        address: streetOrAddress,
         city: address.city,
         state: address.state,
         pincode: address.pincode,
@@ -354,11 +362,9 @@ const createWarehouse = async (req, res) => {
           ? capacityUnit
           : 'kg'
       },
-      storageTypes: Array.isArray(payload.storageTypes)
-        ? payload.storageTypes
-            .map((t) => uiToModelStorageTypes[t] || t)
-            .filter((t) => ['cold_storage', 'dry_storage', 'grain_storage', 'refrigerated', 'frozen', 'ambient', 'controlled_atmosphere'].includes(t))
-        : [],
+      storageTypes: (Array.isArray(payload.storageTypes) ? payload.storageTypes : (typeof payload.storageTypes === 'string' ? payload.storageTypes.split(',') : []))
+        .map((t) => uiToModelStorageTypes[t?.trim()] || t?.trim())
+        .filter((t) => ['cold_storage', 'dry_storage', 'grain_storage', 'refrigerated', 'frozen', 'ambient', 'controlled_atmosphere'].includes(t)),
       facilities: Array.isArray(payload.facilities)
         ? payload.facilities
             .map((f) => {
@@ -376,18 +382,18 @@ const createWarehouse = async (req, res) => {
             .filter((f) => f && allowedFacilities.has(f))
         : [],
       pricing: {
-        basePrice: Number.isFinite(pricePerDay) ? pricePerDay : Number.isFinite(pricePerTon) ? pricePerTon : 0,
-        pricePerUnit: Number.isFinite(pricePerDay) ? 'per_day' : Number.isFinite(pricePerTon) ? 'per_ton' : 'per_day',
-        currency: 'INR',
-        seasonalMultiplier: 1.0
+        basePrice: Number.isFinite(payload?.pricing?.basePrice) ? Number(payload.pricing.basePrice) : (Number.isFinite(pricePerDay) ? pricePerDay : Number.isFinite(pricePerTon) ? pricePerTon : 0),
+        pricePerUnit: payload?.pricing?.pricePerUnit || (Number.isFinite(pricePerDay) ? 'per_day' : Number.isFinite(pricePerTon) ? 'per_ton' : 'per_day'),
+        currency: (payload?.pricing?.currency) || 'INR',
+        seasonalMultiplier: Number.isFinite(payload?.pricing?.seasonalMultiplier) ? Number(payload.pricing.seasonalMultiplier) : 1.0
       },
       images: Array.isArray(payload.images)
         ? payload.images.filter(Boolean).map((url, idx) => ({ url, isPrimary: idx === 0 }))
         : [],
       operatingHours: payload.operatingHours || undefined,
       contact: {
-        phone: req.user.phone || '',
-        email: req.user.email || ''
+        phone: payload?.contact?.phone || req.user.phone || '',
+        email: payload?.contact?.email || req.user.email || ''
       },
       status: 'draft', // default until admin activates
       verification: { status: 'pending' }
@@ -682,6 +688,51 @@ const getOwnerWarehouses = async (req, res) => {
   }
 };
 
+// Set warehouse status (activate/deactivate/maintenance) - owner only
+const setWarehouseStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { status, isAvailable } = req.body || {};
+
+    const allowedStatuses = ['active', 'inactive', 'maintenance'];
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}`
+      });
+    }
+
+    const warehouse = await Warehouse.findOne({ _id: id, owner: userId });
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warehouse not found or you do not have permission to update it'
+      });
+    }
+
+    if (typeof isAvailable === 'boolean') {
+      warehouse.isAvailable = isAvailable;
+    }
+    if (status) {
+      warehouse.status = status;
+    }
+
+    await warehouse.save();
+
+    await warehouse.populate('owner', 'firstName lastName email phone warehouseOwnerProfile');
+
+    return res.json({
+      success: true,
+      message: 'Warehouse status updated',
+      data: warehouse
+    });
+  } catch (error) {
+    logger.error('Error setting warehouse status:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update status', error: error.message });
+  }
+};
+
 // Get warehouse statistics
 const getWarehouseStats = async (req, res) => {
   try {
@@ -734,6 +785,7 @@ module.exports = {
   checkAvailability,
   bookWarehouse,
   getOwnerWarehouses,
+  setWarehouseStatus,
   getWarehouseStats,
   getWarehousesHealth
 };

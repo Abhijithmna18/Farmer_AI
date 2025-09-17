@@ -29,9 +29,14 @@ import CreateGrowthCalendar from "./pages/CreateGrowthCalendar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SearchResults from "./pages/SearchResults";
 import AdminRouter from "./pages/AdminRouter";
+import OwnerRouter from "./pages/OwnerDashboard/OwnerRouter";
 import PlantExplorer from "./pages/PlantExplorer";
 import Feedback from "./pages/Feedback";
 import WarehouseModule from "./pages/WarehouseModule";
+import WarehouseOwnerDashboard from "./pages/WarehouseOwnerDashboard";
+import WarehouseDetails from "./pages/WarehouseDetails";
+import MyBookings from "./pages/MyBookings";
+import Payment from "./pages/Payment";
 
 function App() {
   return (
@@ -68,8 +73,16 @@ function App() {
               <Route path="plants" element={<PlantExplorer />} />
               <Route path="feedback" element={<Feedback />} />
               <Route path="warehouse" element={<WarehouseModule />} />
+              <Route path="warehouses" element={<WarehouseModule />} />
+              <Route path="warehouses/:id" element={<WarehouseDetails />} />
+              <Route path="my-bookings" element={<MyBookings />} />
+              <Route path="payment/:bookingId" element={<Payment />} />
+              {/* Removed owner dashboard from user layout */}
             </Route>
           </Route>
+          {/* Owner Protected Route (top-level, own panel) */}
+          <Route path="/owner/*" element={<OwnerRouter />} />
+
           {/* Admin Protected Route */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/*" element={<AdminRouter />} />

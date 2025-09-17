@@ -303,6 +303,70 @@ const sendNewBookingNotification = async (ownerEmail, bookingData) => {
   return sendEmail(ownerEmail, 'newBookingNotification', bookingData);
 };
 
+// Send booking confirmation to admin
+const sendBookingConfirmationToAdmin = async (adminEmail, bookingData) => {
+  const template = {
+    subject: `New Warehouse Booking - ${bookingData.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">New Warehouse Booking</h2>
+        <p>Dear Admin,</p>
+        <p>A new warehouse booking has been created and requires your attention.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${bookingData.bookingId}</p>
+          <p><strong>Farmer:</strong> ${bookingData.farmerName}</p>
+          <p><strong>Warehouse:</strong> ${bookingData.warehouseName}</p>
+          <p><strong>Owner:</strong> ${bookingData.ownerName}</p>
+          <p><strong>Location:</strong> ${bookingData.warehouseLocation}</p>
+          <p><strong>Produce:</strong> ${bookingData.produceType} (${bookingData.quantity} ${bookingData.unit})</p>
+          <p><strong>Duration:</strong> ${bookingData.startDate} to ${bookingData.endDate}</p>
+          <p><strong>Total Amount:</strong> ₹${bookingData.totalAmount}</p>
+          <p><strong>Payment Status:</strong> ${bookingData.paymentStatus}</p>
+        </div>
+        
+        <p>Please review this booking in the admin dashboard.</p>
+        <p>Best regards,<br>FarmerAI Team</p>
+      </div>
+    `
+  };
+  
+  return sendRawEmail(adminEmail, template.subject, template.html);
+};
+
+// Send booking confirmation to warehouse owner
+const sendBookingConfirmationToOwner = async (ownerEmail, bookingData) => {
+  const template = {
+    subject: `New Booking Request - ${bookingData.bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016;">New Booking Request</h2>
+        <p>Dear ${bookingData.ownerName},</p>
+        <p>You have received a new booking request for your warehouse.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${bookingData.bookingId}</p>
+          <p><strong>Farmer:</strong> ${bookingData.farmerName}</p>
+          <p><strong>Contact:</strong> ${bookingData.farmerEmail} | ${bookingData.farmerPhone || 'N/A'}</p>
+          <p><strong>Warehouse:</strong> ${bookingData.warehouseName}</p>
+          <p><strong>Produce:</strong> ${bookingData.produceType} (${bookingData.quantity} ${bookingData.unit})</p>
+          <p><strong>Duration:</strong> ${bookingData.startDate} to ${bookingData.endDate}</p>
+          <p><strong>Total Amount:</strong> ₹${bookingData.totalAmount}</p>
+          <p><strong>Payment Status:</strong> ${bookingData.paymentStatus}</p>
+          ${bookingData.notes ? `<p><strong>Notes:</strong> ${bookingData.notes}</p>` : ''}
+        </div>
+        
+        <p>Please review and approve/reject this booking in your dashboard.</p>
+        <p>Best regards,<br>FarmerAI Team</p>
+      </div>
+    `
+  };
+  
+  return sendRawEmail(ownerEmail, template.subject, template.html);
+};
+
 module.exports = {
   sendEmail,
   sendRawEmail,
@@ -311,5 +375,7 @@ module.exports = {
   sendBookingApproved,
   sendBookingRejected,
   sendRefundProcessed,
-  sendNewBookingNotification
+  sendNewBookingNotification,
+  sendBookingConfirmationToAdmin,
+  sendBookingConfirmationToOwner
 };

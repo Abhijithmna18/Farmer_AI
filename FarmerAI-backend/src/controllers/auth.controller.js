@@ -362,12 +362,19 @@ exports.getProfile = async (req, res, next) => {
       });
     }
 
+    // Derive a stable primary role prioritizing admin, then explicit role, then roles array, then userType
+    const derivedRole = (Array.isArray(user.roles) && user.roles.includes('admin'))
+      ? 'admin'
+      : (user.role || (Array.isArray(user.roles) && user.roles[0]) || user.userType || 'farmer');
+
     return res.json({ 
       success: true,
       user: { 
         id: user._id, 
         email: user.email, 
-        role: user.role || (Array.isArray(user.roles) && user.roles.includes('admin') ? 'admin' : 'farmer'),
+        role: derivedRole,
+        roles: user.roles,
+        userType: user.userType,
         firstName: user.firstName,
         lastName: user.lastName,
         name: user.name || `${user.firstName} ${user.lastName}`.trim()

@@ -1,7 +1,8 @@
 // src/components/BookingCartModal.jsx
-import React from 'react';
-import { XMarkIcon, TrashIcon, CalendarIcon, CurrencyRupeeIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
+import { XMarkIcon, TrashIcon, CalendarIcon, CurrencyRupeeIcon, PlusIcon, MinusIcon } from '@heroicons/react/24/outline';
 import { useBookingCart } from '../context/BookingCartContext';
+import { useNavigate } from 'react-router-dom';
 
 const BookingCartModal = () => {
   const { 
@@ -9,9 +10,34 @@ const BookingCartModal = () => {
     isCartOpen, 
     setIsCartOpen, 
     removeFromCart, 
+    updateCartItem,
     clearCart, 
     getCartTotal 
   } = useBookingCart();
+  const navigate = useNavigate();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+    
+    setIsProcessing(true);
+    try {
+      // For now, redirect to the first warehouse's booking form
+      // In a full implementation, you'd create a multi-warehouse checkout
+      const firstItem = cartItems[0];
+      setIsCartOpen(false);
+      navigate(`/dashboard/warehouses/${firstItem.warehouse._id}`, {
+        state: { 
+          bookingData: firstItem.bookingData,
+          fromCart: true 
+        }
+      });
+    } catch (error) {
+      console.error('Checkout error:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (!isCartOpen) return null;
 
@@ -48,38 +74,97 @@ const BookingCartModal = () => {
           ) : (
             <div className="space-y-4">
               {cartItems.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-gray-900">{item.warehouse.name}</h3>
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-1">{item.warehouse.name}</h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {item.warehouse.location?.city}, {item.warehouse.location?.state}
+                      </p>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {item.warehouse.storageTypes?.slice(0, 2).map((type, index) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                            {type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                     <button
                       onClick={() => removeFromCart(item.id)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
+                      className="text-red-500 hover:text-red-700 transition-colors p-1"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
                   </div>
                   
-                  <div className="text-sm text-gray-600 mb-2">
-                    <p>{item.warehouse.address?.city}, {item.warehouse.address?.state}</p>
-                    <p>Capacity: {item.warehouse.capacity?.total} {item.warehouse.capacity?.unit}</p>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1">
-                        <CalendarIcon className="h-4 w-4 text-gray-400" />
-                        <span>{item.bookingData.bookingDates?.duration || 7} days</span>
+                  {/* Booking Details */}
+                  <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">Produce:</span>
+                        <span className="ml-1 font-medium">{item.bookingData.produce?.type || 'Not specified'}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <CurrencyRupeeIcon className="h-4 w-4 text-gray-400" />
-                        <span>
-                          ₹{item.warehouse.pricePerDay || item.warehouse.pricePerTon || 0}
-                          {item.warehouse.pricePerDay ? '/day' : '/ton'}
+                      <div>
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="ml-1 font-medium">{item.bookingData.produce?.quantity || 1} {item.bookingData.produce?.unit || 'tons'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Duration:</span>
+                        <span className="ml-1 font-medium">{item.bookingData.bookingDates?.duration || 7} days</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Price:</span>
+                        <span className="ml-1 font-medium">
+                          ₹{item.warehouse.pricing?.basePrice || 0}/day
                         </span>
                       </div>
                     </div>
-                    <div className="font-semibold text-green-600">
-                      ₹{((item.warehouse.pricePerDay || item.warehouse.pricePerTon || 0) * (item.bookingData.bookingDates?.duration || 7)).toFixed(2)}
+                  </div>
+
+                  {/* Quantity and Duration Controls */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Duration:</span>
+                      <div className="flex items-center border border-gray-300 rounded">
+                        <button
+                          onClick={() => {
+                            const currentDuration = item.bookingData.bookingDates?.duration || 7;
+                            if (currentDuration > 1) {
+                              updateCartItem(item.id, {
+                                bookingDates: {
+                                  ...item.bookingData.bookingDates,
+                                  duration: currentDuration - 1
+                                }
+                              });
+                            }
+                          }}
+                          className="p-1 hover:bg-gray-100"
+                        >
+                          <MinusIcon className="h-4 w-4" />
+                        </button>
+                        <span className="px-3 py-1 text-sm font-medium">
+                          {item.bookingData.bookingDates?.duration || 7}
+                        </span>
+                        <button
+                          onClick={() => {
+                            const currentDuration = item.bookingData.bookingDates?.duration || 7;
+                            updateCartItem(item.id, {
+                              bookingDates: {
+                                ...item.bookingData.bookingDates,
+                                duration: currentDuration + 1
+                              }
+                            });
+                          }}
+                          className="p-1 hover:bg-gray-100"
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-green-600">
+                        ₹{((item.warehouse.pricing?.basePrice || 0) * (item.bookingData.bookingDates?.duration || 7) * (item.bookingData.produce?.quantity || 1)).toFixed(2)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -92,7 +177,7 @@ const BookingCartModal = () => {
         {cartItems.length > 0 && (
           <div className="border-t border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-lg font-semibold text-gray-900">Total:</span>
+              <span className="text-lg font-semibold text-gray-900">Total ({cartItems.length} items):</span>
               <span className="text-xl font-bold text-green-600">₹{getCartTotal().toFixed(2)}</span>
             </div>
             
@@ -104,13 +189,18 @@ const BookingCartModal = () => {
                 Clear Cart
               </button>
               <button
-                onClick={() => {
-                  // TODO: Implement checkout flow
-                  console.log('Proceed to checkout');
-                }}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={handleCheckout}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
-                Proceed to Checkout
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  'Proceed to Checkout'
+                )}
               </button>
             </div>
           </div>
@@ -121,6 +211,9 @@ const BookingCartModal = () => {
 };
 
 export default BookingCartModal;
+
+
+
 
 
 

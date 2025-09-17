@@ -32,7 +32,7 @@ export default function Dashboard() {
       console.log('No user found, redirecting to login');
       navigate('/login');
     }
-  }, [user, userLoading, navigate]);
+  }, [user, userLoading, navigate]); // This is correct - all dependencies are needed
   const [isReady, setIsReady] = useState(false);
   const [interactionHistory, setInteractionHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -70,12 +70,12 @@ export default function Dashboard() {
       console.log('User changed, cleared dashboard data');
     }
     previousUserId.current = currentUserId;
-  }, [user]);
+  }, [user?.id, user?._id]); // Only depend on the actual ID values, not the entire user object
 
   // Fetch interaction history from backend
   useEffect(() => {
     const fetchHistory = async () => {
-      if (!user) return; // Don't fetch if no user
+      if (!user?.id && !user?._id) return; // Don't fetch if no user
       
       try {
         setLoadingHistory(true);
@@ -94,11 +94,11 @@ export default function Dashboard() {
       }
     };
     fetchHistory();
-  }, [user]); // Add user as dependency
+  }, [user?.id, user?._id]); // Only depend on user ID, not entire user object
 
   useEffect(() => {
     const fetchCalendars = async () => {
-      if (!user) return; // Don't fetch if no user
+      if (!user?.id && !user?._id) return; // Don't fetch if no user
       
       try {
         setLoadingCalendars(true);
@@ -115,12 +115,14 @@ export default function Dashboard() {
       }
     };
     fetchCalendars();
-  }, [user]); // Add user as dependency
+  }, [user?.id, user?._id]); // Only depend on user ID, not entire user object
 
   // Active calendars + push registration
   useEffect(() => {
-    if (!userLoading && user) {
-      getActiveCalendarsByUser(user.id || user._id).then((res) => {
+    if (!userLoading && user?.id) {
+      const userId = user.id || user._id;
+      
+      getActiveCalendarsByUser(userId).then((res) => {
         setActiveCalendars(Array.isArray(res.data) ? res.data : []);
       }).catch(() => {});
 
@@ -142,7 +144,7 @@ export default function Dashboard() {
         }
       });
     }
-  }, [userLoading, user]);
+  }, [userLoading, user?.id, user?._id]); // Only depend on specific user properties
 
   const lastInteraction = interactionHistory.length > 0 ? interactionHistory[0] : null; // Get the most recent interaction
 

@@ -42,12 +42,15 @@ router.patch('/email-logs/:logId/retry', adminController.retryEmail);
 
 // Warehouse Management
 router.get('/warehouses', adminController.getWarehouses);
+router.post('/warehouses', adminController.createWarehouse);
 router.get('/warehouses/:id', adminController.getWarehouseById);
+router.patch('/warehouses/:id', adminController.updateWarehouse);
 router.patch('/warehouses/:id/verify', adminController.verifyWarehouse);
 router.delete('/warehouses/:id', adminController.deleteWarehouse);
 
 // Booking Management
 router.get('/bookings', adminController.getBookings);
+router.post('/bookings', adminController.createBooking);
 router.get('/bookings/:id', adminController.getBookingById);
 router.patch('/bookings/:id/status', adminController.updateBookingStatus);
 

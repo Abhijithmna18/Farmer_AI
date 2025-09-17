@@ -10,7 +10,6 @@ import WarehouseGrid from '../components/WarehouseGrid';
 import BookingModal from '../components/BookingModal';
 import WarehouseDetailsModal from '../components/WarehouseDetailsModal';
 import BookingCartModal from '../components/BookingCartModal';
-import WarehouseRegistrationForm from '../components/WarehouseRegistrationForm';
 
 const WarehouseListing = () => {
   const { getCartItemCount, setIsCartOpen } = useBookingCart();
@@ -29,7 +28,6 @@ const WarehouseListing = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   
   const containerRef = useRef(null);
   const cardsRef = useRef([]);
@@ -237,27 +235,19 @@ const WarehouseListing = () => {
               </p>
             </div>
             
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowWarehouseForm(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add Warehouse to Rent
-              </button>
-              {/* Cart Button */}
-              <button
-                onClick={() => setIsCartOpen(true)}
-                className="relative flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <ShoppingCartIcon className="h-5 w-5" />
-                <span>Cart</span>
-                {getCartItemCount() > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {getCartItemCount()}
-                  </span>
-                )}
-              </button>
-            </div>
+            {/* Cart Button */}
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <ShoppingCartIcon className="h-5 w-5" />
+              <span>Cart</span>
+              {getCartItemCount() > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {getCartItemCount()}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -362,17 +352,6 @@ const WarehouseListing = () => {
             />
           </>
         )}
-        
-        {/* Add Warehouse Modal */}
-        <WarehouseRegistrationForm
-          isOpen={showWarehouseForm}
-          onClose={() => setShowWarehouseForm(false)}
-          onSuccess={() => {
-            setShowWarehouseForm(false);
-            setPagination(prev => ({ ...prev, current: 1 }));
-            fetchWarehouses();
-          }}
-        />
         
         {/* Cart Modal */}
         <BookingCartModal />
