@@ -2,6 +2,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { askGemini } = require('../services/gemini.service');
 
 const router = express.Router();
 
@@ -32,10 +33,10 @@ async function appendChatRecord(record) {
 }
 
 // POST /api/chat
-// Body: { message: string, history?: { role: 'user'|'assistant', content: string }[] }
+// Body: { message: string, history?: { role: 'user'|'assistant', content: string }[], language?: string }
 router.post('/chat', async (req, res) => {
   try {
-    const { message, history = [] } = req.body || {};
+    const { message, history = [], language = 'en' } = req.body || {};
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
     }
@@ -51,34 +52,9 @@ router.post('/chat', async (req, res) => {
       'Be concise and practical. If users ask about registration, onboarding, recommendations, or reports, guide them clearly.';
 
     const prompt = [systemPreamble, historyText, `User: ${message}`, 'Assistant:'].filter(Boolean).join('\n');
-
-    // Call local Ollama (llama3) - requires Ollama running locally
-    const ollamaUrl = 'http://localhost:11434/api/generate';
-
-    // Use Node.js native fetch (Node >= 18)
-    const response = await fetch(ollamaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama3',
-        prompt,
-        stream: false,
-        options: {
-          temperature: 0.7,
-        },
-      }),
-      // optional timeout pattern could be added with AbortController if needed
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(502).json({ error: 'Ollama error', details: text });
-    }
-
-    const data = await response.json();
-    const reply = data?.response || '';
+    
+    // Use Gemini to generate the assistant reply
+    const reply = await askGemini(prompt, language);
 
     // Persist chat minimally for later PDF/report generation
     appendChatRecord({

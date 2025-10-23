@@ -5,16 +5,24 @@ import { gsap } from 'gsap';
 import apiClient from '../services/apiClient';
 import { toast } from 'react-hot-toast';
 import { loadRazorpayScript, createRazorpayOrder, verifyPayment } from '../config/razorpay';
+import { auth } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 
 const Payment = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth(); // Get user and loading state from AuthContext
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending'); // pending, processing, success, failed
 
   useEffect(() => {
+    console.log('🔍 Payment component mounted - Auth state:', {
+      user: user ? 'Present' : 'Null',
+      authLoading,
+      token: localStorage.getItem('token') ? 'Present' : 'Null'
+    });
     fetchBookingDetails();
   }, [bookingId]);
 
@@ -30,7 +38,20 @@ const Payment = () => {
   const fetchBookingDetails = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/bookings/${bookingId}`);
+      
+      // Ensure we have a valid token
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const freshToken = await currentUser.getIdToken(true);
+          localStorage.setItem('token', freshToken);
+          console.log('✅ Token refreshed for booking fetch');
+        } catch (tokenError) {
+          console.error('❌ Failed to refresh token:', tokenError);
+        }
+      }
+      
+      const response = await apiClient.get(`/warehouse-bookings/${bookingId}`);
       
       if (response.data.success) {
         setBooking(response.data.data);
@@ -39,8 +60,13 @@ const Payment = () => {
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      toast.error('Failed to fetch booking details');
-      navigate('/dashboard/warehouses');
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please login again.');
+        navigate('/login');
+      } else {
+        toast.error('Failed to fetch booking details');
+        navigate('/warehouses');
+      }
     } finally {
       setLoading(false);
     }
@@ -50,6 +76,45 @@ const Payment = () => {
     try {
       setProcessing(true);
       setPaymentStatus('processing');
+
+      // Check authentication - verify either user context OR token exists
+      const token = localStorage.getItem('token');
+      
+      if (!user && !token) {
+        console.error('❌ No authenticated user found');
+        toast.error('Please login to continue with payment');
+        navigate('/login');
+        return;
+      }
+
+      console.log('🔄 Verifying authentication before payment...');
+      console.log('User from context:', user ? 'Present' : 'Null');
+      console.log('Token in localStorage:', token ? 'Present' : 'Null');
+      
+      const currentUser = auth.currentUser;
+      
+      // If Firebase user exists, refresh Firebase token
+      if (currentUser) {
+        try {
+          const freshToken = await currentUser.getIdToken(true); // Force refresh
+          localStorage.setItem('token', freshToken);
+          console.log('✅ Firebase token refreshed successfully');
+        } catch (tokenError) {
+          console.error('❌ Failed to refresh Firebase token:', tokenError);
+          toast.error('Authentication error. Please login again.');
+          navigate('/login');
+          return;
+        }
+      } else if (token) {
+        // For JWT-based auth, token already exists
+        console.log('✅ Using existing JWT token for payment');
+      } else {
+        // No auth method available
+        console.error('❌ No authentication method available');
+        toast.error('Please login to continue with payment');
+        navigate('/login');
+        return;
+      }
 
       // Load Razorpay script
       const scriptLoaded = await loadRazorpayScript();
@@ -74,19 +139,33 @@ const Payment = () => {
         handler: async function (response) {
           try {
             // Verify payment
-            await verifyPayment(booking._id, response.razorpay_payment_id, response.razorpay_signature);
+            const verificationResult = await verifyPayment(
+              booking._id, 
+              response.razorpay_payment_id, 
+              response.razorpay_signature,
+              response.razorpay_order_id
+            );
             
             setPaymentStatus('success');
             toast.success('Payment successful! Booking confirmed.');
             
-            // Redirect to my bookings after 3 seconds
-            setTimeout(() => {
-              navigate('/dashboard/my-bookings');
-            }, 3000);
+            // Refresh booking data to get updated payment status
+            setTimeout(async () => {
+              try {
+                await fetchBookingDetails();
+                // Redirect to my bookings after a short delay to show success message
+                setTimeout(() => {
+                  navigate('/my-bookings');
+                }, 2000);
+              } catch (refreshError) {
+                console.error('Error refreshing booking data:', refreshError);
+                navigate('/my-bookings');
+              }
+            }, 1000);
           } catch (error) {
             console.error('Payment verification error:', error);
             setPaymentStatus('failed');
-            toast.error('Payment verification failed');
+            toast.error('Payment verification failed: ' + (error.response?.data?.message || error.message));
           }
         },
         prefill: {
@@ -109,14 +188,29 @@ const Payment = () => {
       rzp.open();
     } catch (error) {
       console.error('Payment error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setPaymentStatus('failed');
-      toast.error('Payment failed. Please try again.');
+      
+      // Show more specific error messages
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please login again.');
+        navigate('/login');
+      } else if (error.message?.includes('Razorpay script')) {
+        toast.error('Failed to load payment gateway. Please check your internet connection.');
+      } else {
+        toast.error(error.response?.data?.message || 'Payment failed. Please try again.');
+      }
     } finally {
       setProcessing(false);
     }
   };
 
-  if (loading) {
+  // Wait for both auth and booking to load
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
@@ -132,7 +226,7 @@ const Payment = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Not Found</h2>
           <p className="text-gray-600 mb-4">The booking you're looking for doesn't exist.</p>
           <button
-            onClick={() => navigate('/dashboard/warehouses')}
+            onClick={() => navigate('/warehouses')}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             Browse Warehouses

@@ -6,6 +6,45 @@ const authorizeRoles = require('../middlewares/role.middleware');
 const warehouseController = require('../controllers/warehouse.controller');
 const bookingController = require('../controllers/booking.controller');
 const ownerController = require('../controllers/owner.controller');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer storage for warehouse photos (disk storage)
+const warehouseUploadsDir = path.join(__dirname, '../../uploads/warehouses');
+// Ensure upload directory exists
+if (!fs.existsSync(warehouseUploadsDir)) {
+  fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+}
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Ensure directory exists before saving
+    if (!fs.existsSync(warehouseUploadsDir)) {
+      fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+    }
+    cb(null, warehouseUploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}_${file.fieldname}${ext}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 10 // Maximum 10 files
+  },
+  fileFilter: (req, file, cb) => {
+    // Check if file is an image
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 
 // All routes require auth and owner role
 router.use(authenticateToken);
@@ -21,7 +60,20 @@ router.get('/test', (req, res) => {
 });
 
 // Warehouses (owner scope)
-router.post('/warehouses', warehouseController.createWarehouse);
+// Accept multipart form with photos[] and optional warehouseData JSON
+router.post('/warehouses', (req, res, next) => {
+  upload.array('photos', 10)(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({
+        success: false,
+        message: 'File upload error',
+        error: err.message
+      });
+    }
+    next();
+  });
+}, warehouseController.createWarehouse);
 router.get('/warehouses', warehouseController.getOwnerWarehouses);
 router.patch('/warehouses/:id', warehouseController.updateWarehouse);
 router.delete('/warehouses/:id', warehouseController.deleteWarehouse);
@@ -39,6 +91,7 @@ router.get('/revenue/timeseries', bookingController.getOwnerRevenueTimeseries);
 router.post('/bookings/:id/refund', bookingController.refundBooking);
 
 // Analytics (owner scope)
+router.get('/analytics', ownerController.getAnalytics);
 router.get('/analytics/trends', bookingController.getOwnerAnalyticsTrends);
 router.get('/analytics/occupancy', bookingController.getOwnerOccupancyCalendar);
 

@@ -3,6 +3,7 @@ import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { motion } from 'framer-motion';
+import { toMalayalam } from '../utils/malayalamDate';
 import { 
   Plus, 
   Filter, 
@@ -46,6 +47,7 @@ const CalendarView = ({
 }) => {
   const [view, setView] = useState(Views.MONTH);
   const [date, setDate] = useState(new Date());
+  const [calendarSystem, setCalendarSystem] = useState('gregorian'); // 'gregorian' | 'malayalam'
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -137,6 +139,15 @@ const CalendarView = ({
           </div>
         )}
       </div>
+      {/* Malayalam date equivalent */}
+      <div className="mt-2 text-xs text-gray-600">
+        {(() => {
+          try {
+            const ml = toMalayalam(event.start);
+            return <span title={`Gregorian: ${moment(event.start).format('MMM DD, YYYY')}`}>Malayalam: {ml.month} {ml.day}, {ml.year}</span>;
+          } catch { return null; }
+        })()}
+      </div>
       {event.resource?.weatherSnapshot && (
         <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
           <div className="flex items-center gap-1 text-blue-600">
@@ -159,10 +170,29 @@ const CalendarView = ({
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {calendar?.variety && `${calendar.variety} • `}
-              {moment(calendar?.plantingDate).format('MMM DD, YYYY')} - {moment(calendar?.estimatedHarvestDate).format('MMM DD, YYYY')}
+              {calendarSystem === 'gregorian' ? (
+                <>
+                  {moment(calendar?.plantingDate).format('MMM DD, YYYY')} - {moment(calendar?.estimatedHarvestDate).format('MMM DD, YYYY')}
+                </>
+              ) : (
+                (() => {
+                  try {
+                    const mlP = calendar?.plantingDate ? toMalayalam(calendar.plantingDate) : null;
+                    const mlH = calendar?.estimatedHarvestDate ? toMalayalam(calendar.estimatedHarvestDate) : null;
+                    return <span title={`${moment(calendar?.plantingDate).format('MMM DD, YYYY')} - ${moment(calendar?.estimatedHarvestDate).format('MMM DD, YYYY')}`}>{mlP ? `${mlP.month} ${mlP.day}, ${mlP.year}` : '—'} - {mlH ? `${mlH.month} ${mlH.day}, ${mlH.year}` : '—'}</span>;
+                  } catch { return null; }
+                })()
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Calendar system toggle */}
+            <div className="mr-2">
+              <div className="inline-flex rounded-md shadow-sm" role="group">
+                <button type="button" onClick={() => setCalendarSystem('gregorian')} className={`px-2 py-1 text-xs font-medium border ${calendarSystem==='gregorian' ? 'bg-green-600 text-white' : 'bg-white text-gray-700'} rounded-l-md`}>Gregorian</button>
+                <button type="button" onClick={() => setCalendarSystem('malayalam')} className={`px-2 py-1 text-xs font-medium border ${calendarSystem==='malayalam' ? 'bg-green-600 text-white' : 'bg-white text-gray-700'} rounded-r-md`}>Malayalam</button>
+              </div>
+            </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

@@ -4,6 +4,7 @@ import Button from "../components/Button";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import SearchBar from "../components/SearchBar";
+import EventsSection from "../components/home/EventsSection";
 
 // Enhanced decorative icon with animations
 const Icon = ({ children, className = "" }) => (
@@ -122,6 +123,9 @@ export default function Welcome() {
               <Button variant="secondary" onClick={() => nav("/about")} className="text-lg px-8 py-4">
                 {t('common:learnMore')}
               </Button>
+              <Button variant="accent" onClick={() => nav("/workshops")} className="text-lg px-8 py-4">
+                Workshop Tutorials
+              </Button>
             </div>
             <div className="flex items-center gap-8 pt-4">
               <div className="text-center">
@@ -153,6 +157,9 @@ export default function Welcome() {
         </div>
        
       </section>
+
+      {/* Public Upcoming Events */}
+      <EventsSection />
 
       {/* Enhanced Events and Workshops section */}
       <section className="relative bg-gradient-to-br from-[#2f3640] to-[#34495e] text-white pt-32 pb-24">
@@ -289,6 +296,66 @@ export default function Welcome() {
             <Button variant="secondary" onClick={() => nav("/contact")} className="text-lg px-8 py-4">
               Get Started Today
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Us Section */}
+      <section className="py-20 bg-gradient-to-br from-green-500 to-blue-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">Get in Touch</h2>
+            <p className="text-xl text-white/90 max-w-2xl mx-auto">
+              Have questions about our services? Need help with your farming journey? 
+              We're here to help you succeed.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">📧</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Email Support</h3>
+                  <p className="text-white/80">info@farmerai.com</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">📞</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Phone Support</h3>
+                  <p className="text-white/80">+1 (555) 555-5556</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">🕒</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Business Hours</h3>
+                  <p className="text-white/80">Monday - Friday: 9:00 AM - 6:00 PM PST</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <Button 
+                onClick={() => nav("/contact-us")} 
+                variant="accent" 
+                className="text-lg px-8 py-4 bg-white text-green-600 hover:bg-gray-100"
+              >
+                Contact Us Now
+              </Button>
+              <p className="mt-4 text-white/80">
+                We typically respond within 24 hours
+              </p>
+            </div>
           </div>
         </div>
       </section>

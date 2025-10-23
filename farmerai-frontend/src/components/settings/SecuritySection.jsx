@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Eye, EyeOff, Trash2, AlertTriangle, Monitor, MapPin } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trash2, AlertTriangle, Monitor, MapPin, LogOut } from 'lucide-react';
 import { changePassword, getLoginHistory } from '../../services/settingsService';
+import LogoutButton from '../../components/LogoutButton';
 
 export default function SecuritySection({ loading, setLoading, showToast, onDeleteAccount }) {
   const [securityData, setSecurityData] = useState({
@@ -11,21 +12,20 @@ export default function SecuritySection({ loading, setLoading, showToast, onDele
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [loginHistory, setLoginHistory] = useState([]);
 
-  useEffect(() => {
-    const loadLoginHistory = async () => {
-      try {
-        const response = await getLoginHistory();
-        setLoginHistory(response.loginHistory || []);
-      } catch (error) {
-        console.error('Failed to load login history:', error);
-      }
-    };
-    
-    loadLoginHistory();
+  const loadLoginHistory = useCallback(async () => {
+    try {
+      const response = await getLoginHistory();
+      setLoginHistory(response.loginHistory || []);
+    } catch (error) {
+      console.error('Failed to load login history:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    loadLoginHistory();
+  }, [loadLoginHistory]);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -153,6 +153,26 @@ export default function SecuritySection({ loading, setLoading, showToast, onDele
                 <div className="text-sm text-gray-500 dark:text-gray-400">{login.time}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Logout */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Session Management</h3>
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <LogOut className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <span className="font-medium text-blue-800 dark:text-blue-200">Logout</span>
+            </div>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+              Securely logout from your account on this device.
+            </p>
+            <div className="flex justify-start">
+              <LogoutButton 
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                showText={true}
+              />
+            </div>
           </div>
         </div>
 

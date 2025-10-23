@@ -14,16 +14,44 @@ import {
 } from '@heroicons/react/24/outline';
 import { gsap } from 'gsap';
 import apiClient from '../services/apiClient';
+import { toast } from 'react-hot-toast';
+import OverviewDashboard from '../components/admin/OverviewDashboard';
+// Safe import of realtime client
+import { onWarehouseEvent, onBookingEvent } from '../services/realtimeClient';
 
-const AdminWarehouseDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+const AdminWarehouseDashboard = ({ initialTab = 'overview' }) => {
+  console.log('AdminWarehouseDashboard rendering, initialTab:', initialTab);
+  
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [bookings, setBookings] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [hasError, setHasError] = useState(false);
+  
+  // Warehouses filters/pagination
+  const [whStatus, setWhStatus] = useState(''); // '', 'active', 'inactive', 'draft', 'maintenance', 'suspended'
+  const [whVerified, setWhVerified] = useState(''); // '', 'verified', 'pending', 'rejected'
+  const [whPage, setWhPage] = useState(1);
+  const [whPages, setWhPages] = useState(1);
+  const [whTotal, setWhTotal] = useState(0);
+  const [whLimit, setWhLimit] = useState(9);
+  // Bookings filters/pagination
+  const [bkStatus, setBkStatus] = useState(''); // '', 'pending', 'awaiting-approval','approved','rejected','cancelled','completed'
+  const [bkPage, setBkPage] = useState(1);
+  const [bkPages, setBkPages] = useState(1);
+  const [bkTotal, setBkTotal] = useState(0);
+  const [bkLimit, setBkLimit] = useState(9);
+  // Payments filters/pagination
+  const [payStatus, setPayStatus] = useState(''); // '', 'completed','refunded','failed','pending'
+  const [payPage, setPayPage] = useState(1);
+  const [payPages, setPayPages] = useState(1);
+  const [payTotal, setPayTotal] = useState(0);
+  const [payLimit, setPayLimit] = useState(9);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState({}); // bookingId -> boolean
   const [stats, setStats] = useState({
     totalBookings: 0,
     totalWarehouses: 0,
@@ -37,8 +65,49 @@ const AdminWarehouseDashboard = () => {
   const cardsRef = useRef([]);
 
   useEffect(() => {
-    fetchData();
+    try {
+      fetchData();
+    } catch (error) {
+      console.error('Error in fetchData useEffect:', error);
+      setHasError(true);
+    }
   }, [activeTab]);
+
+  // Realtime: refresh the currently active tab when events occur
+  useEffect(() => {
+    const offWh = onWarehouseEvent((evt) => {
+      if (activeTab === 'warehouses') {
+        fetchWarehouses();
+      }
+      // Stats may also change
+      fetchStats();
+    });
+    const offBk = onBookingEvent((evt) => {
+      if (activeTab === 'bookings') {
+        fetchBookings();
+      }
+      // Payments and stats can be affected
+      if (activeTab === 'payments') {
+        fetchPayments();
+      }
+      fetchStats();
+    });
+    return () => {
+      offWh && offWh();
+      offBk && offBk();
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    // Listen for verification events from the modal
+    const handleModalVerifyWarehouse = (event) => {
+      const { warehouseId, status } = event.detail;
+      handleVerifyWarehouse(warehouseId, status);
+    };
+
+    window.addEventListener('verifyWarehouse', handleModalVerifyWarehouse);
+    return () => window.removeEventListener('verifyWarehouse', handleModalVerifyWarehouse);
+  }, []);
 
   useEffect(() => {
     // Animate cards when data changes
@@ -73,11 +142,20 @@ const AdminWarehouseDashboard = () => {
 
   const fetchBookings = async () => {
     try {
-      const response = await apiClient.get('/admin/bookings');
+      const params = new URLSearchParams();
+      params.set('page', String(bkPage));
+      params.set('limit', String(bkLimit));
+      if (bkStatus) params.set('status', bkStatus);
+      const response = await apiClient.get(`/admin/bookings?${params.toString()}`);
       const data = response.data;
 
       if (data.success) {
         setBookings(data.data);
+        if (data.pagination) {
+          setBkPage(data.pagination.current || 1);
+          setBkPages(data.pagination.pages || 1);
+          setBkTotal(data.pagination.total || 0);
+        }
       } else {
         setError(data.message || 'Failed to fetch bookings');
       }
@@ -89,11 +167,21 @@ const AdminWarehouseDashboard = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const response = await apiClient.get('/admin/warehouses');
+      const params = new URLSearchParams();
+      params.set('page', String(whPage));
+      params.set('limit', String(whLimit));
+      if (whStatus) params.set('status', whStatus);
+      if (whVerified) params.set('verified', whVerified);
+      const response = await apiClient.get(`/admin/warehouses?${params.toString()}`);
       const data = response.data;
 
       if (data.success) {
         setWarehouses(data.data);
+        if (data.pagination) {
+          setWhPage(data.pagination.current || 1);
+          setWhPages(data.pagination.pages || 1);
+          setWhTotal(data.pagination.total || 0);
+        }
       } else {
         setError(data.message || 'Failed to fetch warehouses');
       }
@@ -105,11 +193,20 @@ const AdminWarehouseDashboard = () => {
 
   const fetchPayments = async () => {
     try {
-      const response = await apiClient.get('/admin/payments');
+      const params = new URLSearchParams();
+      params.set('page', String(payPage));
+      params.set('limit', String(payLimit));
+      if (payStatus) params.set('status', payStatus);
+      const response = await apiClient.get(`/admin/payments?${params.toString()}`);
       const data = response.data;
 
       if (data.success) {
         setPayments(data.data);
+        if (data.pagination) {
+          setPayPage(data.pagination.current || 1);
+          setPayPages(data.pagination.pages || 1);
+          setPayTotal(data.pagination.total || 0);
+        }
       } else {
         setError(data.message || 'Failed to fetch payments');
       }
@@ -145,6 +242,42 @@ const AdminWarehouseDashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
+    }
+  };
+
+  // Admin actions: update booking status and refund payment
+  const updateBookingStatus = async (bookingId, status, notes) => {
+    try {
+      setActionLoading((prev) => ({ ...prev, [bookingId]: true }));
+      const res = await apiClient.patch(`/admin/bookings/${bookingId}/status`, { status, notes });
+      if (res.data?.success) {
+        toast.success(`Booking ${status.replace('-', ' ')} successfully`);
+        await fetchBookings();
+        await fetchStats();
+      } else {
+        toast.error(res.data?.message || 'Failed to update status');
+      }
+    } catch (e) {
+      console.error('Update booking status failed', e);
+      toast.error('Network error updating booking');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [bookingId]: false }));
+    }
+  };
+
+  const refundPayment = async (paymentId, amount, reason) => {
+    try {
+      const res = await apiClient.post(`/admin/payments/${paymentId}/refund`, { amount, reason });
+      if (res.data?.success) {
+        toast.success('Refund issued successfully');
+        await fetchPayments();
+        await fetchStats();
+      } else {
+        toast.error(res.data?.message || 'Failed to refund');
+      }
+    } catch (e) {
+      console.error('Refund failed', e);
+      toast.error('Network error issuing refund');
     }
   };
 
@@ -259,18 +392,18 @@ const AdminWarehouseDashboard = () => {
     >
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{warehouse.name}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{warehouse.name || 'Warehouse'}</h3>
           <p className="text-sm text-gray-600 flex items-center">
             <MapPinIcon className="h-4 w-4 mr-1" />
-            {warehouse.location.city}, {warehouse.location.state}
+            {(warehouse.location?.city || 'N/A')}, {(warehouse.location?.state || '')}
           </p>
         </div>
         <div className="flex gap-2">
           <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(warehouse.status)}`}>
-            {warehouse.status.toUpperCase()}
+            {(warehouse.status || 'unknown').toUpperCase()}
           </div>
-          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(warehouse.verification.status)}`}>
-            {warehouse.verification.status.toUpperCase()}
+          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(warehouse.verification?.status)}`}>
+            {(warehouse.verification?.status || 'pending').toUpperCase()}
           </div>
         </div>
       </div>
@@ -278,22 +411,22 @@ const AdminWarehouseDashboard = () => {
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-sm text-gray-600">Owner</p>
-          <p className="font-medium">{warehouse.owner.firstName} {warehouse.owner.lastName}</p>
+          <p className="font-medium">{warehouse.owner?.firstName || 'N/A'} {warehouse.owner?.lastName || ''}</p>
         </div>
         <div>
           <p className="text-sm text-gray-600">Price/Day</p>
           <p className="font-medium text-green-600 flex items-center">
             <CurrencyRupeeIcon className="h-4 w-4 mr-1" />
-            {warehouse.pricing.basePrice}
+            {warehouse.pricing?.basePrice ?? 0}
           </p>
         </div>
         <div>
           <p className="text-sm text-gray-600">Capacity</p>
-          <p className="font-medium">{warehouse.capacity.available} {warehouse.capacity.unit}</p>
+          <p className="font-medium">{warehouse.capacity?.available ?? 0} {warehouse.capacity?.unit || ''}</p>
         </div>
         <div>
           <p className="text-sm text-gray-600">Bookings</p>
-          <p className="font-medium">{warehouse.bookings.length}</p>
+          <p className="font-medium">{warehouse.bookings?.length || 0}</p>
         </div>
       </div>
 
@@ -333,13 +466,13 @@ const AdminWarehouseDashboard = () => {
     >
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">#{payment.paymentId}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">#{payment.paymentId || (payment._id ? payment._id.slice(-6) : 'PAY')}</h3>
           <p className="text-sm text-gray-600">
-            {payment.farmer.firstName} {payment.farmer.lastName} → {payment.warehouseOwner.firstName} {payment.warehouseOwner.lastName}
+            {payment.farmer?.firstName} {payment.farmer?.lastName} → {payment.warehouseOwner?.firstName} {payment.warehouseOwner?.lastName}
           </p>
         </div>
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
-          {payment.status.toUpperCase()}
+          {(payment.status || 'unknown').toUpperCase()}
         </div>
       </div>
 
@@ -396,6 +529,25 @@ const AdminWarehouseDashboard = () => {
       ))}
     </div>
   );
+
+  // Error fallback
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-600 mb-4">The warehouse dashboard encountered an error.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="min-h-screen bg-gray-50">
@@ -550,17 +702,34 @@ const AdminWarehouseDashboard = () => {
         {!loading && !error && (
           <>
             {activeTab === 'overview' && (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">📊</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Overview Dashboard</h3>
-                <p className="text-gray-600">
-                  Detailed analytics and charts will be available soon
-                </p>
-              </div>
+              <OverviewDashboard />
             )}
 
             {activeTab === 'bookings' && (
               <>
+                {/* Booking filters */}
+                <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Status</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={bkStatus} onChange={(e) => { setBkStatus(e.target.value); setBkPage(1); }}>
+                      <option value="">All</option>
+                      <option value="pending">Pending</option>
+                      <option value="awaiting-approval">Awaiting Approval</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Per page</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={bkLimit} onChange={(e) => { setBkLimit(parseInt(e.target.value)); setBkPage(1); }}>
+                      <option value={6}>6</option>
+                      <option value={9}>9</option>
+                      <option value={12}>12</option>
+                    </select>
+                  </div>
+                </div>
                 {bookings.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">📦</div>
@@ -569,14 +738,74 @@ const AdminWarehouseDashboard = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {bookings.map((booking, index) => renderBookingCard(booking, index))}
+                    {bookings.map((booking, index) => (
+                      <div key={booking._id}>
+                        {renderBookingCard(booking, index)}
+                        {/* Quick admin actions */}
+                        <div className="flex gap-2 mt-2">
+                          {(() => { const busy = !!actionLoading[booking._id]; return (
+                            <>
+                              <button disabled={busy} onClick={() => updateBookingStatus(booking._id, 'approved')} className={`px-3 py-1 text-xs rounded text-white ${busy ? 'opacity-60 cursor-not-allowed bg-green-600' : 'bg-green-600 hover:bg-green-700'}`} aria-busy={busy}>
+                                {busy ? 'Processing…' : 'Approve'}
+                              </button>
+                              <button disabled={busy} onClick={() => updateBookingStatus(booking._id, 'rejected', 'Rejected by admin')} className={`px-3 py-1 text-xs rounded text-white ${busy ? 'opacity-60 cursor-not-allowed bg-red-600' : 'bg-red-600 hover:bg-red-700'}`} aria-busy={busy}>
+                                {busy ? 'Processing…' : 'Reject'}
+                              </button>
+                              <button disabled={busy} onClick={() => updateBookingStatus(booking._id, 'completed')} className={`px-3 py-1 text-xs rounded text-white ${busy ? 'opacity-60 cursor-not-allowed bg-gray-700' : 'bg-gray-700 hover:bg-gray-800'}`} aria-busy={busy}>
+                                {busy ? 'Processing…' : 'Mark Completed'}
+                              </button>
+                            </>
+                          );})()}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                  <div>Total: {bkTotal}</div>
+                  <div className="flex items-center gap-2">
+                    <button disabled={bkPage <= 1} onClick={() => setBkPage(Math.max(1, bkPage - 1))} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+                    <span>{bkPage} / {bkPages}</span>
+                    <button disabled={bkPage >= bkPages} onClick={() => setBkPage(Math.min(bkPages, bkPage + 1))} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+                  </div>
+                </div>
               </>
             )}
 
             {activeTab === 'warehouses' && (
               <>
+                {/* Warehouse filters */}
+                <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Status</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={whStatus} onChange={(e) => { setWhStatus(e.target.value); setWhPage(1); }}>
+                      <option value="">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="draft">Draft</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Verification</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={whVerified} onChange={(e) => { setWhVerified(e.target.value); setWhPage(1); }}>
+                      <option value="">All</option>
+                      <option value="verified">Verified</option>
+                      <option value="pending">Pending</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Per page</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={whLimit} onChange={(e) => { setWhLimit(parseInt(e.target.value)); setWhPage(1); }}>
+                      <option value={6}>6</option>
+                      <option value={9}>9</option>
+                      <option value={12}>12</option>
+                    </select>
+                  </div>
+                </div>
                 {warehouses.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">🏭</div>
@@ -588,11 +817,41 @@ const AdminWarehouseDashboard = () => {
                     {warehouses.map((warehouse, index) => renderWarehouseCard(warehouse, index))}
                   </div>
                 )}
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                  <div>Total: {whTotal}</div>
+                  <div className="flex items-center gap-2">
+                    <button disabled={whPage <= 1} onClick={() => setWhPage(Math.max(1, whPage - 1))} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+                    <span>{whPage} / {whPages}</span>
+                    <button disabled={whPage >= whPages} onClick={() => setWhPage(Math.min(whPages, whPage + 1))} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+                  </div>
+                </div>
               </>
             )}
 
             {activeTab === 'payments' && (
               <>
+                {/* Payment filters */}
+                <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Status</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={payStatus} onChange={(e) => { setPayStatus(e.target.value); setPayPage(1); }}>
+                      <option value="">All</option>
+                      <option value="completed">Completed</option>
+                      <option value="refunded">Refunded</option>
+                      <option value="failed">Failed</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Per page</label>
+                    <select className="border rounded px-2 py-1 text-sm" value={payLimit} onChange={(e) => { setPayLimit(parseInt(e.target.value)); setPayPage(1); }}>
+                      <option value={6}>6</option>
+                      <option value={9}>9</option>
+                      <option value={12}>12</option>
+                    </select>
+                  </div>
+                </div>
                 {payments.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">💳</div>
@@ -601,9 +860,25 @@ const AdminWarehouseDashboard = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {payments.map((payment, index) => renderPaymentCard(payment, index))}
+                    {payments.map((payment, index) => (
+                      <div key={payment._id}>
+                        {renderPaymentCard(payment, index)}
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => refundPayment(payment._id, payment.amount?.total)} className="px-3 py-1 text-xs rounded bg-purple-600 text-white">Refund Full</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                  <div>Total: {payTotal}</div>
+                  <div className="flex items-center gap-2">
+                    <button disabled={payPage <= 1} onClick={() => setPayPage(Math.max(1, payPage - 1))} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+                    <span>{payPage} / {payPages}</span>
+                    <button disabled={payPage >= payPages} onClick={() => setPayPage(Math.min(payPages, payPage + 1))} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+                  </div>
+                </div>
               </>
             )}
           </>
@@ -654,6 +929,24 @@ const DetailsModal = ({ item, onClose }) => {
     });
   };
 
+  const getStatusColor = (status) => {
+    const colors = {
+      'pending': 'bg-yellow-100 text-yellow-800',
+      'verified': 'bg-green-100 text-green-800',
+      'rejected': 'bg-red-100 text-red-800',
+      'active': 'bg-green-100 text-green-800',
+      'inactive': 'bg-gray-100 text-gray-800',
+      'draft': 'bg-blue-100 text-blue-800',
+      'paid': 'bg-green-100 text-green-800',
+      'failed': 'bg-red-100 text-red-800',
+      'refunded': 'bg-purple-100 text-purple-800',
+      'awaiting-approval': 'bg-yellow-100 text-yellow-800',
+      'approved': 'bg-green-100 text-green-800',
+      'cancelled': 'bg-gray-100 text-gray-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div
       ref={backdropRef}
@@ -680,9 +973,306 @@ const DetailsModal = ({ item, onClose }) => {
 
         {/* Content */}
         <div className="p-6">
-          <pre className="text-sm text-gray-600 overflow-auto">
-            {JSON.stringify(item, null, 2)}
-          </pre>
+          {item.type === 'warehouse' ? (
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Name</label>
+                    <p className="text-gray-900">{item.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Description</label>
+                    <p className="text-gray-900">{item.description}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                      {item.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Verification Status</label>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.verification?.status)}`}>
+                      {item.verification?.status?.toUpperCase() || 'PENDING'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Location</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Address</label>
+                    <p className="text-gray-900">{item.location?.address}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">City</label>
+                    <p className="text-gray-900">{item.location?.city}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">State</label>
+                    <p className="text-gray-900">{item.location?.state}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Pincode</label>
+                    <p className="text-gray-900">{item.location?.pincode}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Owner Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Owner Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Name</label>
+                    <p className="text-gray-900">{item.owner?.firstName} {item.owner?.lastName}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Email</label>
+                    <p className="text-gray-900">{item.owner?.email}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Phone</label>
+                    <p className="text-gray-900">{item.contact?.phone || item.owner?.phone || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Capacity & Pricing */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Capacity & Pricing</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Total Capacity</label>
+                    <p className="text-gray-900">{item.capacity?.total} {item.capacity?.unit}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Available Capacity</label>
+                    <p className="text-gray-900">{item.capacity?.available} {item.capacity?.unit}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Base Price</label>
+                    <p className="text-gray-900">₹{item.pricing?.basePrice}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Price Per Unit</label>
+                    <p className="text-gray-900">{item.pricing?.pricePerUnit}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Storage Types & Facilities */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Storage & Facilities</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Storage Types</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {item.storageTypes?.map((type, index) => (
+                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          {type.replace('_', ' ').toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Facilities</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {item.facilities?.map((facility, index) => (
+                        <span key={index} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                          {facility.replace('_', ' ').toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Verification Details */}
+              {item.verification && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Verification Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Verified At</label>
+                      <p className="text-gray-900">
+                        {item.verification.verifiedAt ? formatDate(item.verification.verifiedAt) : 'Not verified'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Notes</label>
+                      <p className="text-gray-900">{item.verification.notes || 'No notes'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Images */}
+              {item.images && item.images.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Images</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {item.images.map((image, index) => (
+                      <div key={index} className="relative">
+                        <img 
+                          src={image.url} 
+                          alt={image.alt || `Warehouse image ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        {image.isPrimary && (
+                          <span className="absolute top-2 right-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : item.type === 'payment' ? (
+            <div className="space-y-6">
+              {/* Payment Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Payment Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Payment ID</label>
+                    <p className="text-gray-900 font-mono text-sm">{item.razorpay?.paymentId || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Order ID</label>
+                    <p className="text-gray-900 font-mono text-sm">{item.razorpay?.orderId || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                      {item.status?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Amount</label>
+                    <p className="text-gray-900 font-semibold">₹{item.amount?.total || 0}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Currency</label>
+                    <p className="text-gray-900">{item.amount?.currency || 'INR'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Created At</label>
+                    <p className="text-gray-900">{formatDate(item.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Razorpay Details */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Razorpay Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Captured</label>
+                    <p className="text-gray-900">{item.razorpay?.captured ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">International</label>
+                    <p className="text-gray-900">{item.razorpay?.international ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Amount Refunded</label>
+                    <p className="text-gray-900">₹{item.razorpay?.amountRefunded || 0}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Payout Status</label>
+                    <p className="text-gray-900">{item.payout?.status || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parties */}
+              {(item.farmer || item.warehouseOwner) && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Transaction Parties</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {item.farmer && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Farmer</label>
+                        <p className="text-gray-900">{item.farmer.firstName} {item.farmer.lastName}</p>
+                        <p className="text-sm text-gray-500">{item.farmer.email}</p>
+                      </div>
+                    )}
+                    {item.warehouseOwner && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Warehouse Owner</label>
+                        <p className="text-gray-900">{item.warehouseOwner.firstName} {item.warehouseOwner.lastName}</p>
+                        <p className="text-sm text-gray-500">{item.warehouseOwner.email}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : item.type === 'booking' ? (
+            <div className="space-y-6">
+              {/* Booking Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Booking Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Booking ID</label>
+                    <p className="text-gray-900 font-mono">#{item.bookingId}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                      {item.status?.replace('-', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Farmer</label>
+                    <p className="text-gray-900">{item.farmer?.firstName} {item.farmer?.lastName}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Warehouse</label>
+                    <p className="text-gray-900">{item.warehouse?.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Produce Type</label>
+                    <p className="text-gray-900">{item.produce?.type}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Quantity</label>
+                    <p className="text-gray-900">{item.produce?.quantity} {item.produce?.unit}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Start Date</label>
+                    <p className="text-gray-900">{formatDate(item.bookingDates?.startDate)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">End Date</label>
+                    <p className="text-gray-900">{formatDate(item.bookingDates?.endDate)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Total Amount</label>
+                    <p className="text-gray-900 font-semibold text-green-600">₹{item.pricing?.totalAmount}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Created</label>
+                    <p className="text-gray-900">{formatDate(item.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <pre className="text-sm text-gray-600 overflow-auto">
+              {JSON.stringify(item, null, 2)}
+            </pre>
+          )}
         </div>
 
         {/* Actions */}
@@ -693,6 +1283,36 @@ const DetailsModal = ({ item, onClose }) => {
           >
             Close
           </button>
+          {item.type === 'warehouse' && item.verification?.status === 'pending' && (
+            <>
+              <button
+                onClick={() => {
+                  // Call the parent component's verification handler
+                  window.dispatchEvent(new CustomEvent('verifyWarehouse', { 
+                    detail: { warehouseId: item._id, status: 'verified' } 
+                  }));
+                  handleClose();
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <CheckCircleIcon className="h-4 w-4" />
+                Approve
+              </button>
+              <button
+                onClick={() => {
+                  // Call the parent component's verification handler
+                  window.dispatchEvent(new CustomEvent('verifyWarehouse', { 
+                    detail: { warehouseId: item._id, status: 'rejected' } 
+                  }));
+                  handleClose();
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <XCircleIcon className="h-4 w-4" />
+                Reject
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

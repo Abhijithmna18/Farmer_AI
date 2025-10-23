@@ -3,7 +3,7 @@
 
 class RazorpayService {
   constructor() {
-    this.razorpayKey = process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_1234567890';
+    this.razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_1234567890';
     this.loadRazorpayScript();
   }
 
@@ -25,7 +25,7 @@ class RazorpayService {
   // Create Razorpay order
   async createOrder(bookingId, amount, currency = 'INR') {
     try {
-      const response = await fetch('/api/razorpay/create-order', {
+      const response = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,9 +61,9 @@ class RazorpayService {
             // Verify payment on backend
             const verificationResult = await this.verifyPayment({
               bookingId: orderData.bookingId,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-              orderId: response.razorpay_order_id
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              razorpay_order_id: response.razorpay_order_id
             });
 
             if (verificationResult.success) {
@@ -104,7 +104,7 @@ class RazorpayService {
   // Verify payment
   async verifyPayment(paymentData) {
     try {
-      const response = await fetch('/api/razorpay/verify-payment', {
+      const response = await fetch('/api/payments/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,13 +182,3 @@ class RazorpayService {
 
 // Export singleton instance
 export default new RazorpayService();
-
-
-
-
-
-
-
-
-
-

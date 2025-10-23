@@ -32,7 +32,7 @@ const hostEvent = async (req, res) => {
     const subject = 'Verify Your Event Submission';
     const message = `Hi ${farmerName},<br><br>Please verify your event "${title}" by clicking this link: <a href="${verificationLink}">${verificationLink}</a><br><br>Best regards,<br>The FarmerAI Team`;
 
-    await emailService.sendEmail(farmerEmail, subject, message);
+    await emailService.sendRawEmail(farmerEmail, subject, message);
 
     res.status(200).json({ success: true, message: 'Verification email sent.' });
   } catch (error) {
@@ -110,6 +110,31 @@ const rsvp = async (req, res) => {
       { status: newStatus },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
+
+    // Fire-and-forget: send thank-you email
+    try {
+      const userEmail = req.user?.email;
+      if (userEmail) {
+        const subject = `Thank you for enrolling: ${ev.title}`;
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2d5016;">You're enrolled! ✅</h2>
+            <p>Thanks for enrolling in <strong>${ev.title}</strong>.</p>
+            <div style="background:#f8f9fa;padding:16px;border-radius:8px;margin:12px 0">
+              <p><strong>Date & Time:</strong> ${new Date(ev.dateTime).toLocaleString()}</p>
+              <p><strong>Location:</strong> ${ev.locationDetail?.address || ev.location || 'Online/To be announced'}</p>
+            </div>
+            <p>We look forward to seeing you there!</p>
+            <p style="color:#6b7280;font-size:12px;">This is an automated message from FarmerAI.</p>
+          </div>
+        `;
+        // Use raw email to avoid template coupling
+        await emailService.sendRawEmail(userEmail, subject, html);
+      }
+    } catch (e) {
+      // log only; do not fail RSVP
+      console.error('RSVP thank-you email error:', e?.message || e);
+    }
 
     res.json({ success: true, registration: reg });
   } catch (error) {
@@ -207,6 +232,17 @@ const exportPDF = async (req, res) => {
   }
 };
 
+// Return distinct categories from Event collection
+const getCategories = async (req, res) => {
+  try {
+    const categories = await Event.distinct('category', { category: { $ne: null } });
+    res.status(200).json({ success: true, categories });
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch categories' });
+  }
+};
+
 module.exports = {
   hostEvent,
   verifyEvent,
@@ -217,4 +253,5 @@ module.exports = {
   exportCSV,
   exportICS,
   exportPDF,
+  getCategories,
 };

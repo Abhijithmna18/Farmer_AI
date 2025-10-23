@@ -9,6 +9,9 @@ router.use(authenticateToken);
 // Create a new booking (farmer only)
 router.post('/', bookingController.createBooking);
 
+// Create a pending hourly booking (farmer only)
+router.post('/create-hourly', bookingController.createHourlyBooking);
+
 // Get bookings for the authenticated user
 router.get('/', bookingController.getBookings);
 
@@ -34,5 +37,20 @@ router.get('/stats/summary', bookingController.getBookingStats);
 router.get('/stats/revenue', bookingController.getOwnerRevenue);
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

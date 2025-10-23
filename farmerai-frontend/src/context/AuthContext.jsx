@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from "react";
-import { onIdTokenChanged } from "firebase/auth"; // no getAuth here
+import { onIdTokenChanged, getIdToken } from "firebase/auth"; // no getAuth here
 import { auth } from "../firebase"; // use exported auth instance
 import apiClient from "../services/apiClient"; // unified axios instance with baseURL + credentials
 import Toast from "../components/Toast";
@@ -41,6 +41,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Function to refresh token
+  const refreshToken = async () => {
+    if (auth.currentUser) {
+      try {
+        const token = await getIdToken(auth.currentUser, true); // Force refresh
+        localStorage.setItem("token", token);
+        console.log('✅ Firebase ID token refreshed');
+        return token;
+      } catch (error) {
+        console.error('❌ Failed to refresh Firebase ID token:', error);
+        // Clear token on refresh failure
+        localStorage.removeItem('token');
+        throw error;
+      }
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setLoading(true);
@@ -71,8 +88,18 @@ export function AuthProvider({ children }) {
             status: err?.response?.status,
             data: err?.response?.data,
           });
-          setUser({ email: u.email, role: localStorage.getItem('role') || undefined });
-          setError("Could not load full profile from server.");
+          
+          // If it's a 401 error, the token is invalid, so clear it
+          if (err?.response?.status === 401) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("role");
+            localStorage.removeItem("email");
+            setUser(null);
+          } else {
+            // For other errors, still set the user with basic info
+            setUser({ email: u.email, role: localStorage.getItem('role') || undefined });
+            setError("Could not load full profile from server.");
+          }
         } finally {
           setLoading(false);
         }
@@ -117,6 +144,7 @@ export function AuthProvider({ children }) {
           setUser(null);
         }
       } catch (e) {
+        console.error('Failed to initialize from JWT:', e);
         // If token invalid, clear it
         localStorage.removeItem('token');
         // Removed localStorage.removeItem('role'); as role is part of user object
@@ -128,8 +156,19 @@ export function AuthProvider({ children }) {
     initFromJwt();
   }, [user, themeCtx?.setThemeMode, setUser]); // Add user and themeCtx.setThemeMode to dependencies
 
+  // Expose refreshToken function
+  const authContextValue = {
+    user, 
+    setUser, 
+    loading, 
+    error, 
+    setError, 
+    logout,
+    refreshToken
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, error, setError, logout }}>
+    <AuthContext.Provider value={authContextValue}>
       {loading && (
         <div
           role="status"

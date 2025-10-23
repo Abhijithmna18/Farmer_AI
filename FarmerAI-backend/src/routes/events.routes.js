@@ -11,6 +11,8 @@ router.get('/verify/:token', eventController.verifyEvent);
 
 // Route for getting all verified events
 router.get('/', eventController.getEvents);
+// Categories list
+router.get('/categories', eventController.getCategories);
 
 // RSVP (auth required)
 router.post('/:id/rsvp', authenticateToken, eventController.rsvp);

@@ -13,10 +13,17 @@ router.get('/interactions', authenticateToken, assistantController.getInteractio
 router.post('/ask', authenticateToken, assistantController.ask);
 router.get('/history/:userId', authenticateToken, assistantController.history);
 router.get('/insights', authenticateToken, assistantController.insights);
+router.get('/market-trends', authenticateToken, assistantController.getMarketTrends);
 
 // Advisor actions
 router.post('/tasks/complete', authenticateToken, assistantController.completeTask);
 router.post('/tasks/custom', authenticateToken, assistantController.addCustomTask);
 router.post('/alerts/price', authenticateToken, assistantController.setPriceAlert);
+
+// Task Planner CRUD
+router.get('/tasks', authenticateToken, assistantController.listTasks);
+router.post('/tasks', authenticateToken, assistantController.createTask);
+router.patch('/tasks/:id/complete', authenticateToken, assistantController.markTaskComplete);
+router.delete('/tasks/:id', authenticateToken, assistantController.deleteTask);
 
 module.exports = router;

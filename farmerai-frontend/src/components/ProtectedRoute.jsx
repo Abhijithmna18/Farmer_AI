@@ -4,30 +4,29 @@ import { AuthContext } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 
 const ProtectedRoute = ({ allowedRoles }) => {
-  const { user, loading, setUser } = useContext(AuthContext);
+  const { user, loading } = useContext(AuthContext);
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const validate = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        // No session token, immediately mark unauthorized
+        if (!cancelled) {
+          setAuthorized(false);
+          setChecking(false);
+        }
+        return;
+      }
       try {
         // If AuthContext already loaded and has a user, still validate with backend
         await apiClient.get('/auth/me');
-        if (!cancelled) {
-          if (!user) {
-            // backend says valid; ensure at least minimal user state
-            const email = localStorage.getItem('email');
-            const role = localStorage.getItem('role');
-            setUser && setUser(email ? { email, role } : {});
-          }
-          setAuthorized(true);
-        }
+        if (!cancelled) setAuthorized(true);
       } catch (_) {
         // invalid/expired token
         localStorage.removeItem('token');
-        // keep role/email only if you prefer soft-persistence; otherwise clear
-        // localStorage.removeItem('role');
         if (!cancelled) setAuthorized(false);
       } finally {
         if (!cancelled) setChecking(false);
@@ -35,7 +34,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
     };
     validate();
     return () => { cancelled = true; };
-  }, [user, setUser]);
+  }, []);
 
   if (loading || checking) {
     return <div className="flex justify-center items-center min-h-screen text-white">Loading authentication...</div>;

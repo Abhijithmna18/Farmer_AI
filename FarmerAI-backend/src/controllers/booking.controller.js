@@ -13,6 +13,7 @@ const {
   sendBookingConfirmationToOwner
 } = require('../services/email.service');
 const logger = require('../utils/logger');
+const { emitBookingEvent, emitWarehouseEvent } = require('../services/realtime.service');
 
 // Create a new booking
 const createBooking = async (req, res) => {
@@ -156,6 +157,74 @@ const createBooking = async (req, res) => {
   }
 };
 
+// Top-level: Create a pending hourly booking (tonnage × hours)
+const createHourlyBooking = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { warehouseId, tonnage, hoursBooked, startTime, notes } = req.body || {};
+
+    if (!warehouseId || !Number.isFinite(Number(tonnage)) || !Number.isFinite(Number(hoursBooked)) || !startTime) {
+      return res.status(400).json({ success: false, message: 'warehouseId, tonnage, hoursBooked, startTime are required' });
+    }
+
+    const warehouse = await Warehouse.findById(warehouseId).populate('owner', 'firstName lastName email phone');
+    if (!warehouse) {
+      return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    }
+    if (warehouse.status !== 'active') {
+      return res.status(400).json({ success: false, message: 'Warehouse is not available for booking' });
+    }
+
+    // Ensure capacity unit is tons for decrement logic; still allow booking creation
+    const rate = Number(warehouse?.pricing?.hourlyRatePerTon) || 0;
+    const t = Math.max(0, Number(tonnage));
+    const h = Math.max(0, Number(hoursBooked));
+    const totalAmount = Math.round(t * h * rate);
+
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + h * 60 * 60 * 1000);
+
+    const booking = new Booking({
+      bookingId: Booking.generateBookingId(),
+      farmer: userId,
+      warehouse: warehouseId,
+      warehouseOwner: warehouse.owner._id,
+      produce: {
+        type: 'general',
+        quantity: t,
+        unit: 'tons',
+        description: notes || ''
+      },
+      storageRequirements: {
+        storageType: warehouse.storageTypes?.[0] || 'general'
+      },
+      bookingDates: {
+        startDate: start,
+        endDate: end,
+        duration: h // store hours as duration for hourly flow
+      },
+      pricing: {
+        basePrice: rate,
+        totalAmount,
+        currency: 'INR',
+        platformFee: 0,
+        ownerAmount: totalAmount
+      },
+      status: 'pending',
+      payment: { status: 'pending' }
+    });
+
+    await booking.save();
+
+    try { emitBookingEvent('created', { booking }); } catch (_) {}
+
+    return res.status(201).json({ success: true, message: 'Hourly booking created', data: booking });
+  } catch (error) {
+    logger.error('Error creating hourly booking:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create hourly booking', error: error.message });
+  }
+};
+
 // Get all bookings for a user (farmer or warehouse owner)
 const getBookings = async (req, res) => {
   try {
@@ -196,11 +265,23 @@ const getBookings = async (req, res) => {
       .skip((page - 1) * limit)
       .lean();
 
+    // Ensure payment.amountDue is set for each booking
+    const enrichedBookings = bookings.map(booking => {
+      if (!booking.payment) booking.payment = {};
+      if (typeof booking.payment.amountDue !== 'number') {
+        const total = booking.pricing?.totalAmount;
+        if (typeof total === 'number') {
+          booking.payment.amountDue = (booking.payment.status === 'paid') ? 0 : total;
+        }
+      }
+      return booking;
+    });
+
     const total = await Booking.countDocuments(query);
 
     res.json({
       success: true,
-      data: bookings,
+      data: enrichedBookings,
       pagination: {
         current: parseInt(page),
         pages: Math.ceil(total / limit),
@@ -227,7 +308,8 @@ const getBookingById = async (req, res) => {
     const booking = await Booking.findById(id)
       .populate('farmer', 'firstName lastName email phone farmerProfile')
       .populate('warehouse', 'name location facilities images')
-      .populate('warehouseOwner', 'firstName lastName email phone warehouseOwnerProfile');
+      .populate('warehouseOwner', 'firstName lastName email phone warehouseOwnerProfile')
+      .lean();
 
     if (!booking) {
       return res.status(404).json({
@@ -248,6 +330,15 @@ const getBookingById = async (req, res) => {
       });
     }
 
+    // Ensure payment.amountDue is set
+    if (!booking.payment) booking.payment = {};
+    if (typeof booking.payment.amountDue !== 'number') {
+      const total = booking.pricing?.totalAmount;
+      if (typeof total === 'number') {
+        booking.payment.amountDue = (booking.payment.status === 'paid') ? 0 : total;
+      }
+    }
+
     res.json({
       success: true,
       data: booking
@@ -265,9 +356,15 @@ const getBookingById = async (req, res) => {
 // Verify payment and update booking status
 const verifyPayment = async (req, res) => {
   try {
-    const { bookingId, paymentId, signature } = req.body;
+    // Handle both field naming conventions
+    const { bookingId, paymentId, signature, razorpay_payment_id, razorpay_signature, razorpay_order_id } = req.body;
+    
+    // Use the new field names if provided, otherwise fall back to old names
+    const actualPaymentId = razorpay_payment_id || paymentId;
+    const actualSignature = razorpay_signature || signature;
+    const actualOrderId = razorpay_order_id || bookingId;
 
-    const booking = await Booking.findOne({ bookingId });
+    const booking = await Booking.findOne({ bookingId: actualOrderId });
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -276,7 +373,7 @@ const verifyPayment = async (req, res) => {
     }
 
     // Verify payment signature
-    const isValidPayment = verifyRazorpayPayment(booking.payment.razorpayOrderId, paymentId, signature);
+    const isValidPayment = verifyRazorpayPayment(booking.payment.razorpayOrderId, actualPaymentId, actualSignature);
     if (!isValidPayment) {
       return res.status(400).json({
         success: false,
@@ -287,8 +384,8 @@ const verifyPayment = async (req, res) => {
     // Update booking status
     booking.status = 'awaiting-approval';
     booking.payment.status = 'paid';
-    booking.payment.razorpayPaymentId = paymentId;
-    booking.payment.razorpaySignature = signature;
+    booking.payment.razorpayPaymentId = actualPaymentId;
+    booking.payment.razorpaySignature = actualSignature;
     booking.payment.paidAt = new Date();
 
     await booking.save();
@@ -308,8 +405,8 @@ const verifyPayment = async (req, res) => {
       },
       razorpay: {
         orderId: booking.payment.razorpayOrderId,
-        paymentId,
-        signature,
+        paymentId: actualPaymentId,
+        signature: actualSignature,
         status: 'paid',
         captured: true
       },
@@ -324,7 +421,7 @@ const verifyPayment = async (req, res) => {
       await sendPaymentConfirmation(farmer.email, {
         farmerName: farmer.firstName + ' ' + farmer.lastName,
         bookingId: booking.bookingId,
-        paymentId,
+        paymentId: actualPaymentId,
         amount: booking.pricing.totalAmount,
         paymentMethod: 'Razorpay',
         paymentDate: new Date().toLocaleDateString()
@@ -333,6 +430,26 @@ const verifyPayment = async (req, res) => {
       logger.error('Failed to send payment confirmation email:', emailError);
     }
 
+    // Emit event for payment verified
+    try { emitBookingEvent('payment-verified', { bookingId: booking._id, status: booking.status }); } catch (_) {}
+
+    // Decrement warehouse available capacity for hourly-tonnage style bookings
+    try {
+      const wh = await Warehouse.findById(booking.warehouse);
+      if (wh && wh.capacity) {
+        const unit = (wh.capacity.unit || '').toLowerCase();
+        const qtyTons = booking.produce && booking.produce.unit === 'tons' ? Number(booking.produce.quantity) : 0;
+        if (unit === 'tons' && Number.isFinite(qtyTons) && qtyTons > 0) {
+          const newAvailable = Math.max(0, (Number(wh.capacity.available) || 0) - qtyTons);
+          wh.capacity.available = newAvailable;
+          await wh.save();
+          try { emitWarehouseEvent('capacity-updated', { warehouseId: wh._id, available: newAvailable, unit }); } catch (_) {}
+        }
+      }
+    } catch (capErr) {
+      logger.error('Failed to update warehouse capacity after payment:', capErr);
+      // Do not fail the response; capacity can be reconciled by admin if needed
+    }
     res.json({
       success: true,
       message: 'Payment verified successfully',
@@ -407,10 +524,23 @@ const approveBooking = async (req, res) => {
       logger.error('Failed to send approval email:', emailError);
     }
 
+    // Emit event for booking approval
+    try { emitBookingEvent('approved', { bookingId: booking._id }); } catch (_) {}
+    
+    // Convert to plain object and ensure payment.amountDue is set
+    const bookingData = booking.toObject ? booking.toObject() : booking;
+    if (!bookingData.payment) bookingData.payment = {};
+    if (typeof bookingData.payment.amountDue !== 'number') {
+      const total = bookingData.pricing?.totalAmount;
+      if (typeof total === 'number') {
+        bookingData.payment.amountDue = (bookingData.payment.status === 'paid') ? 0 : total;
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Booking approved successfully',
-      data: booking
+      data: bookingData
     });
   } catch (error) {
     logger.error('Error approving booking:', error);
@@ -498,10 +628,23 @@ const rejectBooking = async (req, res) => {
       logger.error('Failed to process refund:', refundError);
     }
 
+    // Emit event for booking rejection
+    try { emitBookingEvent('rejected', { bookingId: booking._id }); } catch (_) {}
+    
+    // Convert to plain object and ensure payment.amountDue is set
+    const bookingData = booking.toObject ? booking.toObject() : booking;
+    if (!bookingData.payment) bookingData.payment = {};
+    if (typeof bookingData.payment.amountDue !== 'number') {
+      const total = bookingData.pricing?.totalAmount;
+      if (typeof total === 'number') {
+        bookingData.payment.amountDue = (bookingData.payment.status === 'paid' || bookingData.payment.status === 'refunded') ? 0 : total;
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Booking rejected successfully',
-      data: booking
+      data: bookingData
     });
   } catch (error) {
     logger.error('Error rejecting booking:', error);
@@ -588,6 +731,8 @@ const cancelBooking = async (req, res) => {
       }
     }
 
+    // Emit event for booking cancellation
+    try { emitBookingEvent('cancelled', { bookingId: booking._id }); } catch (_) {}
     res.json({
       success: true,
       message: 'Booking cancelled successfully',
@@ -707,6 +852,7 @@ const refundBooking = async (req, res) => {
       booking.payment.refundReason = reason;
       await booking.save();
 
+      try { emitBookingEvent('refunded', { bookingId: booking._id, amount: refundAmount }); } catch (_) {}
       return res.json({ success: true, message: 'Refund initiated', data: { bookingId: booking._id, refundAmount } });
     } catch (err) {
       logger.error('Refund initiation failed:', err);
@@ -822,6 +968,7 @@ const getOwnerOccupancyCalendar = async (req, res) => {
 
 module.exports = {
   createBooking,
+  createHourlyBooking,
   getBookings,
   getBookingById,
   verifyPayment,

@@ -48,6 +48,15 @@ const getAssistantHistory = async (userId) => {
   return response.data; // { success, data: [...] }
 };
 
+// New: Get market price trends
+const getMarketTrends = async (crops, days = 7) => {
+  const params = {};
+  if (crops) params.crops = crops;
+  if (days) params.days = days;
+  const response = await apiClient.get('/assistant/market-trends', { params });
+  return response.data; // { success, data: { trends, marketDrivers } }
+};
+
 const assistantService = {
   getRecommendations,
   selectCrop,
@@ -56,7 +65,25 @@ const assistantService = {
   getInteractionHistory,
   askAssistant,
   getAssistantHistory,
+  getMarketTrends,
+  // Task planner helpers
+  async listTasks() {
+    const res = await apiClient.get('/assistant/tasks');
+    return res.data?.data ?? [];
+  },
+  async createTask({ title, dueDate }) {
+    const res = await apiClient.post('/assistant/tasks', { title, dueDate });
+    return res.data?.data;
+  },
+  async completeTask({ id, completed = true, proTip }) {
+    const res = await apiClient.patch(`/assistant/tasks/${id}/complete`, { completed, proTip });
+    return res.data?.data;
+  },
+  async deleteTask(id) {
+    const res = await apiClient.delete(`/assistant/tasks/${id}`);
+    return !!res.data?.success;
+  }
 };
 
 export default assistantService;
-export { getRecommendations, selectCrop, getCultivationGuide, getInteractions, getInteractionHistory, askAssistant, getAssistantHistory };
+export { getRecommendations, selectCrop, getCultivationGuide, getInteractions, getInteractionHistory, askAssistant, getAssistantHistory, getMarketTrends };

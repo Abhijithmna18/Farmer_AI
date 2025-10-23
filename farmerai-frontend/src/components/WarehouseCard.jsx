@@ -1,14 +1,21 @@
 // src/components/WarehouseCard.jsx
 import React, { useRef, useEffect, useState } from 'react';
-import { MapPinIcon, StarIcon, CalendarIcon, CurrencyRupeeIcon, ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, StarIcon, CalendarIcon, CurrencyRupeeIcon, ShoppingCartIcon, HeartIcon, ShareIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon, HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { gsap } from 'gsap';
 import { useBookingCart } from '../context/BookingCartContext';
 
-const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
+const WarehouseCard = ({ 
+  warehouse, 
+  onBook, 
+  onViewDetails, 
+  isFavorited = false, 
+  onToggleFavorite, 
+  onShare,
+  viewMode = 'grid' 
+}) => {
   const cardRef = useRef(null);
   const { addToCart } = useBookingCart();
-  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     // Animate card on mount
@@ -73,7 +80,9 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
 
   const handleToggleFavorite = (e) => {
     e.stopPropagation();
-    setIsFavorited(!isFavorited);
+    if (onToggleFavorite) {
+      onToggleFavorite();
+    }
     
     // Animate the heart icon
     gsap.to(e.currentTarget, {
@@ -132,7 +141,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
   return (
     <div
       ref={cardRef}
-      className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+      className="group rounded-2xl shadow-xl overflow-hidden transition-all duration-300 transform hover:-translate-y-1 border border-white/30 bg-white/30 backdrop-blur-md hover:bg-white/40 hover:shadow-2xl"
     >
       {/* Image */}
       <div className="relative h-48 bg-gradient-to-br from-green-400 to-green-600 overflow-hidden">
@@ -153,6 +162,18 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
         
         {/* Status Badge */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
+          {onShare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare();
+              }}
+              className="p-2 bg-white bg-opacity-90 rounded-full hover:bg-opacity-100 transition-all duration-200"
+              title="Share warehouse"
+            >
+              <ShareIcon className="h-5 w-5 text-gray-600" />
+            </button>
+          )}
           <button
             onClick={handleToggleFavorite}
             className="p-2 bg-white bg-opacity-90 rounded-full hover:bg-opacity-100 transition-all duration-200"
@@ -184,7 +205,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
 
         {/* Rating */}
         {warehouse.rating && warehouse.rating.average > 0 && (
-          <div className="absolute top-4 left-4 bg-white bg-opacity-90 rounded-full px-2 py-1 flex items-center gap-1">
+          <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 border border-white/50">
             <StarSolidIcon className="h-4 w-4 text-yellow-400" />
             <span className="text-sm font-medium">{warehouse.rating.average}</span>
             <span className="text-xs text-gray-500">({warehouse.rating.count})</span>
@@ -196,8 +217,8 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
       <div className="p-6">
         {/* Name and Location */}
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">{warehouse.name}</h3>
-          <div className="flex items-center text-gray-600">
+          <h3 className="text-xl font-semibold text-gray-900 mb-2 drop-shadow-sm">{warehouse.name}</h3>
+          <div className="flex items-center text-gray-700">
             <MapPinIcon className="h-4 w-4 mr-1" />
             <span className="text-sm">
               {warehouse.location.city}, {warehouse.location.state}
@@ -206,7 +227,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
         </div>
 
         {/* Description */}
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+        <p className="text-gray-700 text-sm mb-4 line-clamp-2">
           {warehouse.description}
         </p>
 
@@ -237,11 +258,11 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
               {warehouse.capacity.available} {warehouse.capacity.unit}
             </span>
           </div>
-          <div className="bg-green-50 rounded-lg p-3">
+          <div className="rounded-lg p-3 border border-white/40 bg-white/40 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Starting from</div>
-                <div className="text-lg font-bold text-green-600 flex items-center">
+                <div className="text-sm text-gray-700">Starting from</div>
+                <div className="text-lg font-bold text-green-700 flex items-center">
                   <CurrencyRupeeIcon className="h-5 w-5 mr-1" />
                   {warehouse.pricing.basePrice}
                   <span className="text-sm font-normal text-gray-500 ml-1">/day</span>
@@ -281,7 +302,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
 
         {/* Owner Info */}
         {warehouse.owner && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="mb-4 p-3 rounded-lg border border-white/40 bg-white/40 backdrop-blur-sm">
             <div className="text-sm text-gray-600 mb-1">Owner:</div>
             <div className="font-medium text-gray-900">
               {warehouse.owner.firstName} {warehouse.owner.lastName}
@@ -299,7 +320,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
           <div className="flex gap-2">
             <button
               onClick={handleViewDetails}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 border border-white/40 rounded-lg text-gray-800 hover:bg-white/40 backdrop-blur-sm transition-colors text-sm font-medium flex items-center justify-center gap-2"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -310,7 +331,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
             <button
               onClick={handleAddToCart}
               disabled={warehouse.status !== 'active'}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center"
+              className="px-4 py-2 bg-blue-600/90 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center shadow-md"
               title="Add to Cart"
             >
               <ShoppingCartIcon className="h-4 w-4" />
@@ -319,7 +340,7 @@ const WarehouseCard = ({ warehouse, onBook, onViewDetails }) => {
           <button
             onClick={handleBookClick}
             disabled={warehouse.status !== 'active'}
-            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            className="w-full px-4 py-3 bg-green-600/90 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
           >
             {warehouse.status !== 'active' ? (
               <>

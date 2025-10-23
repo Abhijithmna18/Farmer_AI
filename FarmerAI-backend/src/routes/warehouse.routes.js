@@ -12,6 +12,8 @@ router.get('/health', warehouseController.getWarehousesHealth);
 router.get('/', warehouseController.getWarehouses);
 router.get('/:id', warehouseController.getWarehouseById);
 router.get('/:id/availability', warehouseController.checkAvailability);
+// Quote hourly pricing
+router.post('/:id/quote', warehouseController.quoteHourly);
 
 // Protected routes (authentication required)
 router.use(authenticateToken);
@@ -21,6 +23,8 @@ router.post('/', authorizeRoles(['warehouse-owner']), warehouseController.create
 router.put('/:id', authorizeRoles(['warehouse-owner']), warehouseController.updateWarehouse);
 router.delete('/:id', authorizeRoles(['warehouse-owner']), warehouseController.deleteWarehouse);
 router.get('/owner/my-warehouses', authorizeRoles(['warehouse-owner']), warehouseController.getOwnerWarehouses);
+// Update hourly rate (admin or owner)
+router.patch('/:id/rate', authorizeRoles(['warehouse-owner','admin']), warehouseController.updateHourlyRate);
 
 // Booking routes
 router.post('/:id/book', warehouseController.bookWarehouse);

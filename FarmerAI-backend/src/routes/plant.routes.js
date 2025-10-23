@@ -32,16 +32,51 @@ const upload = multer({
   },
 });
 
+// Error handling middleware for multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ 
+        success: false, 
+        message: 'Image file is too large. Please select an image smaller than 10MB.' 
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Unexpected field name. Please use "plantImage" or "image" for the file field.' 
+      });
+    }
+    return res.status(400).json({ 
+      success: false, 
+      message: `Upload error: ${err.message}` 
+    });
+  }
+  if (err.message === 'Only image files are allowed') {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Only image files are allowed. Please select a JPEG, PNG, or WebP file.' 
+    });
+  }
+  next(err);
+};
+
 const router = express.Router();
 
 // Serve uploaded files statically
 router.use('/uploads', express.static(uploadsDir));
 
 // Upload + Identify (expects field name 'plantImage')
-router.post('/upload', upload.single('plantImage'), controller.uploadAndIdentify);
+router.post('/upload', upload.single('plantImage'), handleMulterError, controller.uploadAndIdentify);
+
+// Alias: Identify (accepts field name 'image' to be compatible with other clients)
+router.post('/identify', upload.single('image'), handleMulterError, controller.uploadAndIdentify);
 
 // Classify via Hugging Face (returns labels + scores)
-router.post('/classify', upload.single('plantImage'), controller.classifyWithHF);
+router.post('/classify', upload.single('plantImage'), handleMulterError, controller.classifyWithHF);
+
+// Fetch enriched details by name (no persistence)
+router.get('/details', controller.detailsByName);
 
 // CRUD
 router.get('/', controller.getAll);

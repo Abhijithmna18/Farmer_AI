@@ -13,7 +13,7 @@ const navItems = [
   { label: 'Feedback', to: '/admin/feedback', icon: '💬', badge: 'feedback' },
   { label: 'Products', to: '/admin/dashboard/products', icon: '🧺' },
   { label: 'Events', to: '/admin/dashboard/events', icon: '📅' },
-  { label: 'Growth Calendar', to: '/admin/dashboard/calendar', icon: '🌱' },
+  { label: 'Growth Calendar', to: '/admin/growth-calendar', icon: '🌱' },
   { label: 'Warehouse', to: '/admin/warehouse', icon: '🏪' },
   { label: 'Contact Messages', to: '/admin/dashboard/contacts', icon: '✉️' },
   { label: 'Settings', to: '/admin/dashboard/settings', icon: '⚙️' },
@@ -65,11 +65,30 @@ export default function AdminLayout() {
 
       {/* Top bar */}
       <div className="sticky top-0 z-30 backdrop-blur bg-white/70 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button className="md:hidden px-3 py-2 rounded-lg border" onClick={() => setOpen(v => !v)}>☰</button>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <button aria-label="Toggle navigation" className="md:hidden px-3 py-2 rounded-lg border" onClick={() => setOpen(v => !v)}>☰</button>
           <div className="font-semibold text-slate-800">Admin Console</div>
+          {/* Search */}
+          <div className="hidden md:flex flex-1 max-w-xl ml-4">
+            <div className="relative w-full">
+              <input
+                type="search"
+                placeholder="Search users, warehouses, bookings..."
+                className="w-full px-3 py-2 pl-9 rounded-lg border bg-white text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+              />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">🔎</span>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
-            <button className="px-3 py-2 text-sm rounded-lg bg-white border shadow-sm">🔔</button>
+            {/* Notifications with badge */}
+            <div className="relative">
+              <button aria-label="Notifications" className="px-3 py-2 text-sm rounded-lg bg-white border shadow-sm">🔔</button>
+              {(pendingRequestsCount + pendingFeedbackCount) > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                  {Math.min(99, pendingRequestsCount + pendingFeedbackCount)}
+                </span>
+              )}
+            </div>
             <button onClick={handleLogout} className="px-3 py-2 text-sm rounded-lg bg-red-50 text-red-600 border border-red-200">Logout</button>
             <div className="w-9 h-9 rounded-full bg-emerald-200 grid place-items-center" title={user?.email || 'Admin'}>
               {(user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || user?.email || 'A')[0].toUpperCase()}

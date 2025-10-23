@@ -60,7 +60,7 @@ const WarehouseDetails = () => {
       if (response.data.success) {
         toast.success('Booking request submitted successfully!');
         setShowBookingForm(false);
-        navigate('/dashboard/my-bookings');
+        navigate('/my-bookings');
       } else {
         toast.error(response.data.message || 'Failed to submit booking');
       }
@@ -86,7 +86,7 @@ const WarehouseDetails = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => navigate('/dashboard/warehouses')}
+            onClick={() => navigate('/warehouses')}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             Back to Warehouses
@@ -104,7 +104,7 @@ const WarehouseDetails = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Warehouse Not Found</h2>
           <p className="text-gray-600 mb-4">The warehouse you're looking for doesn't exist.</p>
           <button
-            onClick={() => navigate('/dashboard/warehouses')}
+            onClick={() => navigate('/warehouses')}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             Back to Warehouses
@@ -127,7 +127,7 @@ const WarehouseDetails = () => {
             <ol className="inline-flex items-center space-x-1 md:space-x-3">
               <li className="inline-flex items-center">
                 <button
-                  onClick={() => navigate('/dashboard/warehouses')}
+                  onClick={() => navigate('/warehouses')}
                   className="text-gray-700 hover:text-green-600"
                 >
                   Warehouses
@@ -343,5 +343,20 @@ const WarehouseDetails = () => {
 };
 
 export default WarehouseDetails;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

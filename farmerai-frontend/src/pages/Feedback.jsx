@@ -71,7 +71,10 @@ export default function Feedback() {
       {/* Content */}
       <Section className="space-y-6">
         {activeTab === 'list' && (
-          <FeedbackList onViewDetails={handleViewDetails} />
+          <FeedbackList 
+            onViewDetails={handleViewDetails}
+            onSwitchToSubmit={() => setActiveTab('submit')}
+          />
         )}
         
         {activeTab === 'submit' && (

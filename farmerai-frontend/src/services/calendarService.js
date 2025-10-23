@@ -9,6 +9,58 @@ const getGrowthCalendar = async () => {
   return response.data;
 };
 
+// Malayalam calendars mapped with Malayalam date equivalents
+export const getMalayalamCalendars = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.year) params.append('year', filters.year);
+    if (filters.season) params.append('season', filters.season);
+    if (filters.isActive !== undefined) params.append('isActive', filters.isActive);
+    const qs = params.toString();
+    const url = qs ? `${API_PATH}/malayalam?${qs}` : `${API_PATH}/malayalam`;
+    const response = await apiClient.get(url);
+    const body = response.data;
+    return Array.isArray(body) ? body : (body?.data || []);
+  } catch (error) {
+    console.error('❌ Error fetching Malayalam calendars:', error);
+    throw error?.response?.data || error;
+  }
+};
+
+// AI assistance: generate schedule from crop + soil + region
+export const generateAISchedule = async ({ cropName, soilType, region, plantingDate }) => {
+  try {
+    const response = await apiClient.post(`${API_PATH}/ai/schedule`, {
+      cropName,
+      soilType,
+      region,
+      plantingDate,
+    });
+    return response.data; // { schedule, estimatedHarvestDate }
+  } catch (error) {
+    console.error('❌ Error generating AI schedule:', error);
+    throw error?.response?.data || error;
+  }
+};
+
+// AI assistance: predict yield from features
+export const predictYield = async ({ cropName, soilType, area, irrigationFrequency, fertilizerType, historicalYield }) => {
+  try {
+    const response = await apiClient.post(`${API_PATH}/ai/predict-yield`, {
+      cropName,
+      soilType,
+      area,
+      irrigationFrequency,
+      fertilizerType,
+      historicalYield,
+    });
+    return response.data; // { estimatedYieldKg, yieldPerHectareKg }
+  } catch (error) {
+    console.error('❌ Error predicting yield:', error);
+    throw error?.response?.data || error;
+  }
+};
+
 // Calendar CRUD operations
 export const createGrowthCalendar = async (calendarData) => {
   try {
@@ -30,9 +82,15 @@ export const getGrowthCalendars = async (filters = {}) => {
     if (filters.season) params.append('season', filters.season);
     if (filters.isActive !== undefined) params.append('isActive', filters.isActive);
     
-    const response = await apiClient.get(`${API_PATH}?${params.toString()}`);
-    console.log(`✅ Retrieved ${response.data.data?.length || 0} calendars`);
-    return response.data;
+    const qs = params.toString();
+    const url = qs ? `${API_PATH}?${qs}` : API_PATH;
+    const response = await apiClient.get(url);
+    const body = response.data;
+    const list = Array.isArray(body)
+      ? body
+      : (Array.isArray(body?.data) ? body.data : []);
+    console.log(`✅ Retrieved ${list.length} calendars`);
+    return list;
   } catch (error) {
     console.error('❌ Error fetching growth calendars:', error);
     throw error?.response?.data || error;

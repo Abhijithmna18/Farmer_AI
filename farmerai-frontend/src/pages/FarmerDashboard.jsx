@@ -12,6 +12,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { gsap } from 'gsap';
+import apiClient from '../services/apiClient';
 
 const FarmerDashboard = () => {
   const [bookings, setBookings] = useState([]);
@@ -47,17 +48,11 @@ const FarmerDashboard = () => {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/warehouses/bookings/my-bookings', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-
-      if (data.success) {
+      const { data } = await apiClient.get('/warehouse-bookings/my-bookings');
+      if (data?.success) {
         setBookings(data.data);
       } else {
-        setError(data.message || 'Failed to fetch bookings');
+        setError(data?.message || 'Failed to fetch bookings');
       }
     } catch (err) {
       setError('Network error. Please try again.');
@@ -69,14 +64,8 @@ const FarmerDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/warehouses/stats/bookings', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-
-      if (data.success) {
+      const { data } = await apiClient.get('/warehouses/stats/bookings');
+      if (data?.success) {
         setStats(data.data);
       }
     } catch (err) {
@@ -95,22 +84,12 @@ const FarmerDashboard = () => {
     }
 
     try {
-      const response = await fetch(`/api/warehouses/bookings/${bookingId}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ reason: 'Cancelled by farmer' })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      const { data } = await apiClient.post(`/warehouse-bookings/${bookingId}/cancel`, { reason: 'Cancelled by farmer' });
+      if (data?.success) {
         fetchBookings();
         fetchStats();
       } else {
-        alert(data.message || 'Failed to cancel booking');
+        alert(data?.message || 'Failed to cancel booking');
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
@@ -589,6 +568,19 @@ const BookingDetailsModal = ({ booking, onClose, onCancel }) => {
 };
 
 export default FarmerDashboard;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

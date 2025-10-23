@@ -16,10 +16,10 @@ const UserSchema = new mongoose.Schema(
     verificationCode: { type: String },
     verificationCodeExpires: { type: Date },
     roles: { type: [String], default: ['farmer'] },
-    role: { type: String, enum: ['farmer', 'warehouse-owner', 'admin'], default: 'farmer', index: true },
+    role: { type: String, enum: ['farmer', 'admin', 'warehouse-owner'], default: 'farmer', index: true },
     userType: { 
       type: String, 
-      enum: ['farmer', 'buyer', 'warehouse-owner', 'both'], 
+      enum: ['farmer', 'buyer', 'both', 'warehouse-owner'], 
       default: 'farmer',
       index: true 
     },
@@ -110,49 +110,40 @@ const UserSchema = new mongoose.Schema(
       totalOrders: { type: Number, default: 0 }
     },
 
-    // Warehouse Owner-specific fields
+    // Warehouse owner-specific fields
     warehouseOwnerProfile: {
       businessName: { type: String },
-      businessType: { type: String, enum: ['individual', 'partnership', 'company', 'cooperative'] },
-      registrationNumber: { type: String },
+      businessType: { type: String, enum: ['individual', 'company', 'partnership'] },
       gstNumber: { type: String },
       panNumber: { type: String },
       businessAddress: {
         address: { type: String },
         city: { type: String },
         state: { type: String },
-        pincode: { type: String },
-        coordinates: {
-          latitude: { type: Number },
-          longitude: { type: Number }
-        }
+        pincode: { type: String }
       },
       bankDetails: {
         accountNumber: { type: String },
         ifscCode: { type: String },
         bankName: { type: String },
-        accountHolderName: { type: String },
-        upiId: { type: String }
+        accountHolderName: { type: String }
       },
-      documents: [{
-        type: { type: String, enum: ['license', 'permit', 'gst', 'pan', 'bank', 'insurance', 'other'] },
-        url: { type: String, required: true },
-        name: { type: String, required: true },
-        expiryDate: { type: Date },
-        uploadedAt: { type: Date, default: Date.now }
-      }],
       verificationStatus: {
         type: String,
         enum: ['unverified', 'pending', 'verified', 'rejected'],
         default: 'unverified'
       },
+      verificationDocuments: [{
+        type: { type: String },
+        url: { type: String },
+        uploadedAt: { type: Date, default: Date.now }
+      }],
       rating: {
         average: { type: Number, default: 0, min: 0, max: 5 },
         count: { type: Number, default: 0 }
       },
       totalBookings: { type: Number, default: 0 },
-      totalEarnings: { type: Number, default: 0 },
-      isActive: { type: Boolean, default: true }
+      totalRevenue: { type: Number, default: 0 }
     },
 
     // User preferences
@@ -223,7 +214,7 @@ UserSchema.virtual('isBuyer').get(function() {
 
 // Virtual for checking if user is a warehouse owner
 UserSchema.virtual('isWarehouseOwner').get(function() {
-  return this.userType === 'warehouse-owner' || this.userType === 'both' || this.role === 'warehouse-owner';
+  return this.userType === 'warehouse-owner' || this.role === 'warehouse-owner';
 });
 
 // Virtual for checking if farmer is verified
@@ -259,22 +250,6 @@ UserSchema.methods.updateBuyerRating = function(newRating) {
   
   this.buyerProfile.rating.average = Math.round(newAverage * 10) / 10; // Round to 1 decimal
   this.buyerProfile.rating.count = newCount;
-  
-  return this.save();
-};
-
-// Instance method to update warehouse owner rating
-UserSchema.methods.updateWarehouseOwnerRating = function(newRating) {
-  if (!this.warehouseOwnerProfile) {
-    this.warehouseOwnerProfile = {};
-  }
-  
-  const currentTotal = this.warehouseOwnerProfile.rating.average * this.warehouseOwnerProfile.rating.count;
-  const newCount = this.warehouseOwnerProfile.rating.count + 1;
-  const newAverage = (currentTotal + newRating) / newCount;
-  
-  this.warehouseOwnerProfile.rating.average = Math.round(newAverage * 10) / 10;
-  this.warehouseOwnerProfile.rating.count = newCount;
   
   return this.save();
 };

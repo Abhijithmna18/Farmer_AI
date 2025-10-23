@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import Toast from './Toast';
@@ -8,6 +8,16 @@ export default function LogoutButton({ className = "", showText = true, variant 
   const [toast, setToast] = useState({ message: '', type: 'info' });
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const toastTimeoutRef = useRef(null);
+
+  // Clear timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleLogout = async () => {
     if (loading) return;
@@ -24,12 +34,23 @@ export default function LogoutButton({ className = "", showText = true, variant 
         }, 1500);
       } else {
         setToast({ message: result.message, type: 'error' });
+        // Clear loading state on error
+        setLoading(false);
       }
     } catch (error) {
       setToast({ message: 'Logout failed. Please try again.', type: 'error' });
-    } finally {
+      // Clear loading state on error
       setLoading(false);
     }
+  };
+
+  const dismissToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast({ message: '', type: 'info' });
+    }, 300); // Small delay to prevent flashing
   };
 
   if (variant === "icon") {
@@ -46,7 +67,13 @@ export default function LogoutButton({ className = "", showText = true, variant 
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </button>
-        <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '', type: 'info' })} />
+        {toast.message && (
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onDismiss={dismissToast} 
+          />
+        )}
       </>
     );
   }
@@ -64,15 +91,13 @@ export default function LogoutButton({ className = "", showText = true, variant 
         </svg>
         {showText && (loading ? 'Logging out...' : 'Logout')}
       </button>
-      <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '', type: 'info' })} />
+      {toast.message && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onDismiss={dismissToast} 
+        />
+      )}
     </>
   );
 }
-
-
-
-
-
-
-
-

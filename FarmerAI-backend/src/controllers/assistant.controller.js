@@ -1,5 +1,6 @@
 const Interaction = require('../models/Interaction.js');
 const AssistantHistory = require('../models/AssistantHistory');
+const AssistantTask = require('../models/AssistantTask');
 const { askGemini } = require('../services/gemini.service');
 const notificationService = require('../services/notification.service');
 
@@ -52,7 +53,22 @@ const getRecommendations = async (req, res) => {
     return res.status(400).json({ message: 'Soil type, season, and location are required.' });
   }
 
-  const recommendedCrops = getMockRecommendations(soilType, season, location);
+  let recommendedCrops;
+  try {
+    const prompt = `Given soil type "${soilType}", season "${season}", and location "${location}", recommend 5 suitable crops for smallholder farmers in India. Return ONLY JSON in this exact shape: {"recommendations":["Crop1","Crop2","Crop3","Crop4","Crop5"]}`;
+    const reply = await askGemini(prompt, 'en');
+    const cleaned = reply
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '');
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+    const arr = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+    recommendedCrops = arr.length ? arr : getMockRecommendations(soilType, season, location);
+  } catch (e) {
+    recommendedCrops = getMockRecommendations(soilType, season, location);
+  }
 
   const interaction = new Interaction({
     user: userId,
@@ -151,26 +167,82 @@ module.exports = {
     try {
       const userId = req.user.id || req.user._id;
       const location = (req.query.location || 'kerala').toLowerCase();
-      const prompt = `Generate weekly farming tasks (Kerala, post-monsoon, Sept 11, 2025), last 7-day market price trends for rubber & pepper, and 5-day weather forecast with temp & humidity. Return ONLY JSON in this exact shape: {"tasks":["..."],"marketTrends":{"rubber":[n,n,n,n,n,n,n],"pepper":[n,n,n,n,n,n,n]},"weather":[{"day":"Fri","icon":"rain","temp":28,"humidity":80}]}`;
+      const prompt = `Generate weekly farming tasks (${location}, post-monsoon, today), last 7-day market price trends for rubber & pepper, and 5-day weather forecast with temp & humidity. Return ONLY JSON in this exact shape: {"tasks":["..."],"marketTrends":{"rubber":[n,n,n,n,n,n,n],"pepper":[n,n,n,n,n,n,n]},"weather":[{"day":"Fri","icon":"rain","temp":28,"humidity":80}]}`;
 
-      const reply = await askGemini(prompt, 'en');
+      // Helper to produce a robust local fallback when Gemini is unavailable or returns bad JSON
+      const buildFallback = () => {
+        const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const now = new Date();
+        const seq = (n, base = 100, jitter = 5) => Array.from({ length: n }, (_, i) => Math.max(1, Math.round(base + (i - (n-1)/2) * 1.5 + (Math.random()*2-1)*jitter)));
+        const weather = Array.from({ length: 5 }, (_, i) => {
+          const d = new Date(now.getTime() + i*24*60*60*1000);
+          const icon = i % 2 === 0 ? 'rain' : (i % 3 === 0 ? 'cloud' : 'sun');
+          const temp = 26 + ((i%3) * 2);
+          const humidity = 68 + (i%4)*5;
+          return { day: days[d.getDay()], icon, temp, humidity, rain: icon === 'rain' ? 8 + (i%3)*4 : 0 };
+        });
+        const hourly = Array.from({ length: 12 }, (_, i) => ({
+          time: `${(6+i).toString().padStart(2,'0')}:00`,
+          icon: i % 4 === 0 ? 'rain' : (i % 3 === 0 ? 'cloud' : 'sun'),
+          temp: 24 + Math.round(Math.sin(i/3)*3),
+          humidity: 65 + (i%5)*4
+        }));
+        const tasks = [
+          `Inspect fields for fungal issues due to high humidity in ${location}.`,
+          'Apply balanced NPK based on soil test; prefer split dose.',
+          'Mulch beds to conserve moisture and suppress weeds.',
+          'Scout for pests (aphids/mites) and deploy yellow sticky traps.',
+          'Schedule irrigation early morning; avoid waterlogging after rains.'
+        ];
+        return {
+          tasks,
+          marketTrends: {
+            rubber: seq(7, 162, 6),
+            pepper: seq(7, 518, 12)
+          },
+          weather,
+          hourly,
+          advice: 'High humidity increases disease risk; prioritize field sanitation and timely preventive sprays.'
+        };
+      };
 
+      let reply = '';
       let data;
+
+      // Try Gemini, but gracefully fallback if it fails or env is missing
       try {
-        const jsonStart = reply.indexOf('{');
-        const jsonEnd = reply.lastIndexOf('}');
-        data = JSON.parse(reply.slice(jsonStart, jsonEnd + 1));
-      } catch (e) {
-        return res.status(502).json({ message: 'Gemini returned unexpected format', raw: reply });
+        reply = await askGemini(prompt, 'en');
+        try {
+          // Some models wrap JSON in code fences; strip them if present
+          const cleaned = reply
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/```\s*$/i, '');
+          const jsonStart = cleaned.indexOf('{');
+          const jsonEnd = cleaned.lastIndexOf('}');
+          data = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+        } catch (parseErr) {
+          console.warn('Insights JSON parse failed, using fallback. Parse error:', parseErr?.message);
+          data = buildFallback();
+        }
+      } catch (err) {
+        // Common case: GEMINI_API_KEY not configured or API error
+        console.warn('Gemini unavailable for insights, using fallback:', err?.message);
+        reply = `FALLBACK_USED: ${err?.message || 'unknown'}`;
+        data = buildFallback();
       }
 
-      await AssistantHistory.create({
-        userId,
-        type: 'insight',
-        query: prompt,
-        reply,
-        metadata: { location, parsed: data }
-      });
+      try {
+        await AssistantHistory.create({
+          userId,
+          type: 'insight',
+          query: prompt,
+          reply,
+          metadata: { location, parsed: data }
+        });
+      } catch (logErr) {
+        console.warn('Failed to log AssistantHistory for insights:', logErr?.message);
+      }
 
       res.json({ success: true, data });
     } catch (e) {
@@ -178,6 +250,60 @@ module.exports = {
     }
   }
   ,
+  // --- Task Planner (persistent CRUD) ---
+  listTasks: async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const tasks = await AssistantTask.find({ userId }).sort({ completed: 1, createdAt: -1 }).lean();
+      return res.json({ success: true, data: tasks });
+    } catch (e) {
+      return res.status(500).json({ message: e.message || 'Failed to list tasks' });
+    }
+  },
+  createTask: async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { title, dueDate } = req.body;
+      if (!title || !title.trim()) return res.status(400).json({ message: 'title is required' });
+      const task = await AssistantTask.create({ userId, title: title.trim(), dueDate: dueDate ? new Date(dueDate) : undefined });
+      // Log in history (optional)
+      try { await AssistantHistory.create({ userId, type: 'insight', query: 'task_create', reply: title, metadata: { dueDate } }); } catch {}
+      return res.status(201).json({ success: true, data: task });
+    } catch (e) {
+      return res.status(500).json({ message: e.message || 'Failed to create task' });
+    }
+  },
+  markTaskComplete: async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { id } = req.params;
+      const { completed = true, proTip } = req.body || {};
+      const task = await AssistantTask.findOne({ _id: id, userId });
+      if (!task) return res.status(404).json({ message: 'Task not found' });
+      task.completed = !!completed;
+      if (proTip) task.proTip = proTip;
+      await task.save();
+      try { await AssistantHistory.create({ userId, type: 'insight', query: 'task_complete', reply: task.title, metadata: { completed: task.completed, proTip } }); } catch {}
+      return res.json({ success: true, data: task });
+    } catch (e) {
+      return res.status(500).json({ message: e.message || 'Failed to update task' });
+    }
+  },
+  deleteTask: async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { id } = req.params;
+      const task = await AssistantTask.findOneAndDelete({ _id: id, userId });
+      if (!task) return res.status(404).json({ message: 'Task not found' });
+      try { await AssistantHistory.create({ userId, type: 'insight', query: 'task_delete', reply: task.title }); } catch {}
+      return res.json({ success: true });
+    } catch (e) {
+      return res.status(500).json({ message: e.message || 'Failed to delete task' });
+    }
+  },
+  // --- End Task Planner ---
+  
+  
   // Mark a task completed and log pro tip
   completeTask: async (req, res) => {
     try {
@@ -219,4 +345,111 @@ module.exports = {
       res.status(500).json({ message: e.message || 'Failed to set price alert' });
     }
   }
+};
+
+// Get market price trends for crops
+const getMarketTrends = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { crops = ['Rice', 'Wheat', 'Maize'], days = 7 } = req.query;
+    
+    // Ensure crops is an array
+    const cropArray = Array.isArray(crops) ? crops : [crops];
+    
+    // Create a prompt for Gemini to generate market price trends
+    const prompt = `Generate realistic market price trends for the following crops over the last ${days} days in Kerala, India. 
+    Crops: ${cropArray.join(', ')}
+    
+    Return ONLY a JSON object with this exact structure:
+    {
+      "trends": {
+        "cropName1": [price1, price2, ..., price${days}],
+        "cropName2": [price1, price2, ..., price${days}]
+      },
+      "marketDrivers": "Brief explanation of factors affecting prices"
+    }
+    
+    Use realistic price ranges for Kerala agricultural markets. Prices should be in INR per kg.`;
+
+    let reply = '';
+    let data;
+
+    // Try Gemini, but gracefully fallback if it fails
+    try {
+      reply = await askGemini(prompt, 'en');
+      try {
+        // Strip code fences if present
+        const cleaned = reply
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```\s*$/i, '');
+        const jsonStart = cleaned.indexOf('{');
+        const jsonEnd = cleaned.lastIndexOf('}');
+        data = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+      } catch (parseErr) {
+        console.warn('Market trends JSON parse failed, using fallback. Parse error:', parseErr?.message);
+        // Fallback with mock data
+        data = {
+          trends: {},
+          marketDrivers: 'Based on typical market conditions in Kerala.'
+        };
+        
+        // Generate mock data for each crop
+        for (const crop of cropArray) {
+          // Generate a realistic price trend with some variation
+          const basePrice = 10 + Math.random() * 40; // Base price between 10-50 INR/kg
+          const trend = [];
+          for (let i = 0; i < days; i++) {
+            // Add some random variation (-10% to +10%)
+            const variation = 1 + (Math.random() * 0.2 - 0.1);
+            trend.push(parseFloat((basePrice * variation).toFixed(2)));
+          }
+          data.trends[crop] = trend;
+        }
+      }
+    } catch (err) {
+      console.warn('Gemini unavailable for market trends, using fallback:', err?.message);
+      reply = `FALLBACK_USED: ${err?.message || 'unknown'}`;
+      
+      // Fallback with mock data
+      data = {
+        trends: {},
+        marketDrivers: 'Based on typical market conditions in Kerala.'
+      };
+      
+      // Generate mock data for each crop
+      for (const crop of cropArray) {
+        // Generate a realistic price trend with some variation
+        const basePrice = 10 + Math.random() * 40; // Base price between 10-50 INR/kg
+        const trend = [];
+        for (let i = 0; i < days; i++) {
+          // Add some random variation (-10% to +10%)
+          const variation = 1 + (Math.random() * 0.2 - 0.1);
+          trend.push(parseFloat((basePrice * variation).toFixed(2)));
+        }
+        data.trends[crop] = trend;
+      }
+    }
+
+    try {
+      await AssistantHistory.create({
+        userId,
+        type: 'market_trends',
+        query: prompt,
+        reply,
+        metadata: { crops: cropArray, days, parsed: data }
+      });
+    } catch (logErr) {
+      console.warn('Failed to log AssistantHistory for market trends:', logErr?.message);
+    }
+
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ message: e.message || 'Failed to fetch market trends' });
+  }
+};
+
+module.exports = {
+  ...module.exports,
+  getMarketTrends
 };

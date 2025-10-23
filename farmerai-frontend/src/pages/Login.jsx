@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useContext } from "react";
 import { gsap } from "gsap";
+import { Leaf, Home } from "lucide-react";
 import InputField from "../components/InputField";
 import PasswordField from "../components/PasswordField";
 import RememberMeCheckbox from "../components/RememberMeCheckbox";
@@ -56,6 +57,8 @@ export default function Login() {
     let cancelled = false;
     const checkAuth = async () => {
       try {
+        const existing = localStorage.getItem('token');
+        if (!existing) return; // avoid unnecessary /auth/me calls causing 401 loops
         const res = await apiClient.get('/auth/me');
         if (!cancelled && res?.data?.user) {
           setUser && setUser(res.data.user);
@@ -212,18 +215,39 @@ export default function Login() {
         password: form.password
       });
       
+      console.log('=== LOGIN RESPONSE DEBUG ===');
+      console.log('Full response:', response);
+      console.log('Response data:', response.data);
+      console.log('Response data keys:', Object.keys(response.data));
+      
       const { token } = response.data;
       const role = response?.data?.user?.role || response?.data?.role;
       const email = response?.data?.user?.email || form.email;
       const roles = response?.data?.user?.roles;
       const userType = response?.data?.user?.userType;
       
-      console.log('Login response data:', response.data);
+      console.log('Extracted token:', token);
+      console.log('Token type:', typeof token);
+      console.log('Token length:', token?.length);
       console.log('Detected role:', role);
       console.log('Detected userType:', userType);
       console.log('Detected roles:', roles);
+      
+      if (!token) {
+        console.error('❌ NO TOKEN IN RESPONSE!');
+        setToast({ message: "Login failed - no token received", type: "error" });
+        setIsLoading(false);
+        return;
+      }
+      
       if (isLocalStorageAvailable()) {
+        console.log('✅ LocalStorage is available');
+        console.log('Setting token in localStorage...');
         localStorage.setItem('token', token);
+        console.log('Token set! Verifying...');
+        const storedToken = localStorage.getItem('token');
+        console.log('Stored token:', storedToken ? 'EXISTS' : 'NULL');
+        console.log('Stored token matches:', storedToken === token);
         if (role) localStorage.setItem('role', role);
         if (roles && Array.isArray(roles)) localStorage.setItem('roles', JSON.stringify(roles));
         if (userType) localStorage.setItem('userType', userType);
@@ -316,13 +340,35 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 hidden-until-ready"
+      className="min-h-screen flex items-center justify-center p-4 hidden-until-ready relative"
       style={{
         background: "linear-gradient(135deg, #e8f5e8 0%, #f0f9eb 25%, #e6f4ea 50%, #d4ede1 75%, #c8e6c8 100%)",
         backgroundSize: "400% 400%",
         animation: "gradientShift 15s ease infinite"
       }}
     >
+      {/* Decorative plant background image */}
+      <div 
+        className="absolute inset-0 opacity-10 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/Planting Tutorial.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(1px)"
+        }}
+      ></div>
+      
+      {/* Fixed Home Button */}
+      <button
+        onClick={() => nav("/")}
+        className="fixed top-6 left-6 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-sm hover:bg-white transition-all duration-300 rounded-full px-4 py-2 shadow-lg hover:shadow-xl border border-green-200 group"
+        aria-label="Go to Home"
+      >
+        <Home className="w-4 h-4 text-green-600 group-hover:text-green-700 transition-colors" />
+        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+          Home
+        </span>
+      </button>
       {/* Decorative leaves */}
       {[...Array(3)].map((_, i) => (
         <div
@@ -347,7 +393,7 @@ export default function Login() {
         className={`w-full max-w-md bg-white bg-opacity-90 backdrop-blur-xl
                   rounded-3xl border-2 border-green-100 border-opacity-60
                   shadow-[0_25px_60px_-15px_rgba(76,175,80,0.25)] 
-                  p-8 relative overflow-hidden z-10`}
+                  p-8 relative overflow-hidden z-20`}
         style={{ opacity: 0 }}
       >
         {/* Decorative accents */}

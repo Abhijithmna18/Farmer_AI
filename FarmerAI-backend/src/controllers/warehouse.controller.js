@@ -5,6 +5,51 @@ const Booking = require('../models/Booking');
 const { createOrder } = require('../config/razorpay');
 const { sendNewBookingNotification } = require('../services/email.service');
 const logger = require('../utils/logger');
+const { emitWarehouseEvent, emitBookingEvent } = require('../services/realtime.service');
+
+// Quote hourly tonnage pricing
+const quoteHourly = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tonnage, hours } = req.body || {};
+    const t = Number(tonnage);
+    const h = Number(hours);
+    if (!Number.isFinite(t) || !Number.isFinite(h) || t <= 0 || h <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid tonnage or hours' });
+    }
+    const warehouse = await Warehouse.findById(id).lean();
+    if (!warehouse) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    const rate = Number(warehouse?.pricing?.hourlyRatePerTon) || 0;
+    const total = Math.round(t * h * rate);
+    return res.json({ success: true, data: { ratePerTonPerHour: rate, tonnage: t, hours: h, total } });
+  } catch (error) {
+    logger.error('Error quoting hourly:', error);
+    return res.status(500).json({ success: false, message: 'Failed to get quote', error: error.message });
+  }
+};
+
+// Update hourly rate (admin or owner)
+const updateHourlyRate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { hourlyRatePerTon } = req.body || {};
+    const rate = Number(hourlyRatePerTon);
+    if (!Number.isFinite(rate) || rate < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid hourlyRatePerTon' });
+    }
+    const updated = await Warehouse.findByIdAndUpdate(
+      id,
+      { $set: { 'pricing.hourlyRatePerTon': rate } },
+      { new: true }
+    ).lean();
+    if (!updated) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    try { emitWarehouseEvent('rate-updated', { warehouseId: id, hourlyRatePerTon: rate }); } catch (_) {}
+    return res.json({ success: true, message: 'Hourly rate updated', data: { hourlyRatePerTon: rate } });
+  } catch (error) {
+    logger.error('Error updating hourly rate:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update hourly rate', error: error.message });
+  }
+};
 
 // Get all warehouses with filters
 const getWarehouses = async (req, res) => {
@@ -353,7 +398,7 @@ const createWarehouse = async (req, res) => {
         pincode: address.pincode,
         coordinates: hasValidCoords
           ? { type: 'Point', coordinates: [lng, lat] }
-          : undefined
+          : { type: 'Point', coordinates: [0, 0] }
       },
       capacity: {
         total: Number.isFinite(totalCapacity) ? totalCapacity : 0,
@@ -362,7 +407,7 @@ const createWarehouse = async (req, res) => {
           ? capacityUnit
           : 'kg'
       },
-      storageTypes: (Array.isArray(payload.storageTypes) ? payload.storageTypes : (typeof payload.storageTypes === 'string' ? payload.storageTypes.split(',') : []))
+      storageTypes: (Array.isArray(payload.storageTypes) ? payload.storageTypes : (typeof payload.storageTypes === 'string' ? payload.storageTypes.split(',') : ['cold_storage']))
         .map((t) => uiToModelStorageTypes[t?.trim()] || t?.trim())
         .filter((t) => ['cold_storage', 'dry_storage', 'grain_storage', 'refrigerated', 'frozen', 'ambient', 'controlled_atmosphere'].includes(t)),
       facilities: Array.isArray(payload.facilities)
@@ -382,7 +427,7 @@ const createWarehouse = async (req, res) => {
             .filter((f) => f && allowedFacilities.has(f))
         : [],
       pricing: {
-        basePrice: Number.isFinite(payload?.pricing?.basePrice) ? Number(payload.pricing.basePrice) : (Number.isFinite(pricePerDay) ? pricePerDay : Number.isFinite(pricePerTon) ? pricePerTon : 0),
+        basePrice: Number.isFinite(payload?.pricing?.basePrice) ? Number(payload.pricing.basePrice) : (Number.isFinite(pricePerDay) ? pricePerDay : Number.isFinite(pricePerTon) ? pricePerTon : 100),
         pricePerUnit: payload?.pricing?.pricePerUnit || (Number.isFinite(pricePerDay) ? 'per_day' : Number.isFinite(pricePerTon) ? 'per_ton' : 'per_day'),
         currency: (payload?.pricing?.currency) || 'INR',
         seasonalMultiplier: Number.isFinite(payload?.pricing?.seasonalMultiplier) ? Number(payload.pricing.seasonalMultiplier) : 1.0
@@ -392,8 +437,8 @@ const createWarehouse = async (req, res) => {
         : [],
       operatingHours: payload.operatingHours || undefined,
       contact: {
-        phone: payload?.contact?.phone || req.user.phone || '',
-        email: payload?.contact?.email || req.user.email || ''
+        phone: payload?.contact?.phone || req.user.phone || '0000000000',
+        email: payload?.contact?.email || req.user.email || 'contact@warehouse.com'
       },
       status: 'draft', // default until admin activates
       verification: { status: 'pending' }
@@ -407,11 +452,25 @@ const createWarehouse = async (req, res) => {
       });
     }
 
+    // If photos were uploaded via multipart, map them into images
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      console.log('Uploaded files:', req.files.map(f => ({ filename: f.filename, path: f.path })));
+      mapped.images = req.files.map((file, index) => ({
+        url: `/uploads/warehouses/${file.filename}`,
+        isPrimary: index === 0
+      }));
+    } else {
+      console.log('No files uploaded or req.files is not an array:', req.files);
+    }
+
     const warehouse = new Warehouse(mapped);
     await warehouse.save();
 
     // Populate owner details
     await warehouse.populate('owner', 'firstName lastName email phone warehouseOwnerProfile');
+
+    // Emit realtime event for creation
+    try { emitWarehouseEvent('created', { warehouse }); } catch (_) {}
 
     res.status(201).json({
       success: true,
@@ -420,6 +479,14 @@ const createWarehouse = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error creating warehouse:', error);
+    // Handle validation errors with 400 status instead of 500
+    if (error && error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error while creating warehouse',
+        error: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to create warehouse',
@@ -448,6 +515,9 @@ const updateWarehouse = async (req, res) => {
       req.body,
       { new: true, runValidators: true }
     ).populate('owner', 'firstName lastName email phone warehouseOwnerProfile');
+
+    // Emit realtime event for update
+    try { emitWarehouseEvent('updated', { warehouse: updatedWarehouse }); } catch (_) {}
 
     res.json({
       success: true,
@@ -493,6 +563,9 @@ const deleteWarehouse = async (req, res) => {
     }
 
     await Warehouse.findByIdAndDelete(id);
+
+    // Emit realtime event for deletion
+    try { emitWarehouseEvent('deleted', { id }); } catch (_) {}
 
     res.json({
       success: true,
@@ -636,6 +709,9 @@ const bookWarehouse = async (req, res) => {
       logger.error('Failed to send notification email:', emailError);
     }
 
+    // Emit realtime event for booking creation
+    try { emitBookingEvent('created', { booking }); } catch (_) {}
+
     res.status(201).json({
       success: true,
       message: 'Booking created successfully',
@@ -658,23 +734,31 @@ const bookWarehouse = async (req, res) => {
 const getOwnerWarehouses = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 10 } = req.query;
+    let { page = 1, limit = 'all' } = req.query;
 
-    const warehouses = await Warehouse.find({ owner: userId })
+    const baseQuery = { owner: userId };
+    const q = Warehouse.find(baseQuery)
       .populate('bookings', 'bookingId status bookingDates produce')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
       .lean();
 
-    const total = await Warehouse.countDocuments({ owner: userId });
+    let warehouses;
+    if (String(limit).toLowerCase() === 'all' || Number(limit) <= 0) {
+      warehouses = await q.exec();
+    } else {
+      const lim = Math.min(1000, Math.max(1, parseInt(limit)));
+      const pg = Math.max(1, parseInt(page));
+      warehouses = await q.limit(lim).skip((pg - 1) * lim).exec();
+    }
+
+    const total = await Warehouse.countDocuments(baseQuery);
 
     res.json({
       success: true,
       data: warehouses,
       pagination: {
-        current: parseInt(page),
-        pages: Math.ceil(total / limit),
+        current: String(limit).toLowerCase() === 'all' ? 1 : parseInt(page),
+        pages: String(limit).toLowerCase() === 'all' || Number(limit) <= 0 ? 1 : Math.ceil(total / Math.max(1, parseInt(limit))),
         total
       }
     });
@@ -721,6 +805,9 @@ const setWarehouseStatus = async (req, res) => {
     await warehouse.save();
 
     await warehouse.populate('owner', 'firstName lastName email phone warehouseOwnerProfile');
+
+    // Emit realtime event for status change
+    try { emitWarehouseEvent('status-changed', { warehouse }); } catch (_) {}
 
     return res.json({
       success: true,
@@ -787,6 +874,8 @@ module.exports = {
   getOwnerWarehouses,
   setWarehouseStatus,
   getWarehouseStats,
-  getWarehousesHealth
+  getWarehousesHealth,
+  quoteHourly,
+  updateHourlyRate
 };
 

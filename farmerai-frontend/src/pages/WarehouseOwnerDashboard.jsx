@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import apiClient from '../services/apiClient';
+import { onWarehouseEvent, onBookingEvent } from '../services/realtimeClient';
 import useAuth from '../hooks/useAuth';
 import WarehouseRegistrationForm from '../components/WarehouseRegistrationForm';
 
@@ -87,7 +88,7 @@ const WarehouseOwnerDashboard = () => {
       setLoading(true);
       setError(null);
       const [whRes, bkRes, payStatsRes, bkStatsRes] = await Promise.all([
-        apiClient.get('/warehouses/owner/my-warehouses'),
+        apiClient.get('/warehouses/owner/my-warehouses?limit=all'),
         apiClient.get('/warehouses/bookings/my-bookings?status=awaiting-approval'),
         apiClient.get('/warehouses/stats/payments'),
         apiClient.get('/warehouses/stats/bookings')
@@ -105,6 +106,22 @@ const WarehouseOwnerDashboard = () => {
   };
 
   useEffect(() => { refreshAll(); }, []);
+
+  // Realtime updates: refresh on any warehouse or booking event
+  useEffect(() => {
+    const offWh = onWarehouseEvent((evt) => {
+      // If this owner cares only about their warehouses, safe to refresh on any change
+      refreshAll();
+    });
+    const offBk = onBookingEvent((evt) => {
+      // Booking approvals, payments, cancellations should reflect in dashboard stats
+      refreshAll();
+    });
+    return () => {
+      offWh && offWh();
+      offBk && offBk();
+    };
+  }, []);
 
   const totalWarehouses = warehouses.length;
   const activeBookings = bookingStats?.approved || 0;
@@ -170,7 +187,12 @@ const WarehouseOwnerDashboard = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Warehouse Owner Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {user?.firstName && user?.lastName 
+                ? `${user.firstName} ${user.lastName}'s Dashboard` 
+                : user?.displayName || user?.name || user?.email?.split('@')[0] || "Warehouse Owner Dashboard"
+              }
+            </h1>
             <p className="text-gray-600">Manage warehouses, bookings, and revenue</p>
           </div>
           <button onClick={() => { setEditingWarehouse(null); setShowForm(true); }} className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700">Add New Warehouse</button>

@@ -130,7 +130,7 @@ const WarehouseModule = () => {
         console.log('Booking created:', response.data.data);
         setShowBookingModal(false);
         // Show success message and redirect to my bookings
-        navigate('/dashboard/my-bookings');
+        navigate('/my-bookings');
       } else {
         console.error('Booking failed:', response.data.message);
       }
@@ -220,21 +220,21 @@ const WarehouseModule = () => {
 
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-gray-50">
+    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 rounded-2xl border border-white/40 bg-white/30 backdrop-blur-md shadow-xl p-6">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-green-100 rounded-full">
+                <div className="p-3 rounded-full border border-white/50 bg-white/50 backdrop-blur-sm">
                   <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-1">Storage Marketplace</h1>
-                  <p className="text-gray-600 text-lg">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-1 drop-shadow-sm">Storage Marketplace</h1>
+                  <p className="text-gray-700 text-lg">
                     Find the perfect storage solution for your agricultural produce
                   </p>
                 </div>
@@ -242,19 +242,19 @@ const WarehouseModule = () => {
               
               {/* Quick Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                <div className="rounded-xl p-4 border border-white/50 bg-white/40 backdrop-blur-sm shadow">
                   <div className="text-2xl font-bold text-green-600">{pagination.total}</div>
                   <div className="text-sm text-gray-600">Available Warehouses</div>
                 </div>
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                <div className="rounded-xl p-4 border border-white/50 bg-white/40 backdrop-blur-sm shadow">
                   <div className="text-2xl font-bold text-blue-600">24/7</div>
                   <div className="text-sm text-gray-600">Customer Support</div>
                 </div>
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                <div className="rounded-xl p-4 border border-white/50 bg-white/40 backdrop-blur-sm shadow">
                   <div className="text-2xl font-bold text-purple-600">100%</div>
                   <div className="text-sm text-gray-600">Secure Storage</div>
                 </div>
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                <div className="rounded-xl p-4 border border-white/50 bg-white/40 backdrop-blur-sm shadow">
                   <div className="text-2xl font-bold text-orange-600">₹50</div>
                   <div className="text-sm text-gray-600">Starting Price/Day</div>
                 </div>
@@ -264,8 +264,8 @@ const WarehouseModule = () => {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               {/* My Bookings Button */}
               <button
-                onClick={() => navigate('/dashboard/my-bookings')}
-                className="px-6 py-3 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                onClick={() => navigate('/my-bookings')}
+                className="px-6 py-3 text-gray-800 border border-white/50 rounded-lg hover:bg-white/40 backdrop-blur-sm transition-colors flex items-center justify-center gap-2 font-medium"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -276,7 +276,7 @@ const WarehouseModule = () => {
               {/* Cart Button */}
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="relative flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg hover:shadow-xl"
+                className="relative flex items-center justify-center gap-2 px-6 py-3 bg-green-600/90 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg hover:shadow-xl backdrop-blur-sm"
               >
                 <ShoppingCartIcon className="h-5 w-5" />
                 <span>My Cart</span>
@@ -290,11 +290,8 @@ const WarehouseModule = () => {
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <WarehouseFilters onChange={handleFilterChange} initial={filters} />
-
         {/* Results Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="rounded-2xl shadow-xl border border-white/50 bg-white/40 backdrop-blur-md p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -321,7 +318,7 @@ const WarehouseModule = () => {
                     setSortOrder(newSortOrder);
                     handleFilterChange({ ...filters, sortBy: newSortBy, sortOrder: newSortOrder });
                   }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  className="px-3 py-2 border border-white/60 bg-white/40 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                 >
                   <option value="createdAt-desc">Newest First</option>
                   <option value="pricing.basePrice-asc">Price: Low to High</option>
@@ -333,11 +330,11 @@ const WarehouseModule = () => {
               </div>
 
               {/* View Mode Toggle */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-white/40 backdrop-blur-sm rounded-lg p-1 border border-white/60">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-md transition-colors ${
-                    viewMode === 'grid' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    viewMode === 'grid' ? 'bg-white/80 text-green-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
                   }`}
                   title="Grid View"
                 >
@@ -346,7 +343,7 @@ const WarehouseModule = () => {
                 <button
                   onClick={() => setViewMode('list')}
                   className={`p-2 rounded-md transition-colors ${
-                    viewMode === 'list' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    viewMode === 'list' ? 'bg-white/80 text-green-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
                   }`}
                   title="List View"
                 >
@@ -359,7 +356,7 @@ const WarehouseModule = () => {
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+          <div className="bg-red-50/70 backdrop-blur-sm border border-red-200/70 rounded-2xl p-6 mb-6 shadow">
             <div className="flex items-start">
               <div className="flex-shrink-0">
                 <svg className="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,7 +369,7 @@ const WarehouseModule = () => {
                 <div className="mt-4">
                   <button
                     onClick={() => fetchWarehouses()}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-red-600/90 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                   >
                     Try Again
                   </button>
@@ -411,7 +408,7 @@ const WarehouseModule = () => {
 
         {/* Empty State */}
         {!loading && !error && warehouses.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <div className="rounded-2xl border border-white/50 bg-white/40 backdrop-blur-md p-12 text-center shadow">
             <div className="text-8xl mb-6">🏭</div>
             <h3 className="text-2xl font-semibold text-gray-900 mb-3">No storage facilities found</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
@@ -420,13 +417,13 @@ const WarehouseModule = () => {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => handleFilterChange({})}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                className="px-6 py-3 bg-green-600/90 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 Clear All Filters
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-3 border border-white/60 bg-white/40 backdrop-blur-sm text-gray-800 rounded-lg hover:bg-white/50 transition-colors font-medium"
               >
                 Back to Dashboard
               </button>

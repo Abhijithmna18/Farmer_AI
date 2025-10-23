@@ -126,7 +126,10 @@ const BookingSchema = new mongoose.Schema(
       actualEndDate: { type: Date },
       condition: { type: String, enum: ['excellent', 'good', 'fair', 'poor'] },
       notes: { type: String }
-    }
+    },
+    // Added fields for reminder tracking
+    remindersSent: [{ type: String }], // Track which reminders have been sent
+    reminderMetadata: { type: mongoose.Schema.Types.Mixed } // Store additional reminder metadata
   },
   {
     timestamps: true,

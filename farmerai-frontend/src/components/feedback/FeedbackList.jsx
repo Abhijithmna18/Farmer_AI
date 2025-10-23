@@ -17,7 +17,7 @@ import {
 import Toast from '../Toast';
 import apiClient from '../../services/apiClient';
 
-const FeedbackList = ({ onViewDetails }) => {
+const FeedbackList = ({ onViewDetails, onSwitchToSubmit }) => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -25,6 +25,7 @@ const FeedbackList = ({ onViewDetails }) => {
     status: 'all',
     type: 'all'
   });
+  const [query, setQuery] = useState('');
   const [pagination, setPagination] = useState({
     current: 1,
     pages: 1,
@@ -54,6 +55,13 @@ const FeedbackList = ({ onViewDetails }) => {
       setLoading(false);
     }
   };
+
+  // Derived counts for chips
+  const counts = React.useMemo(() => {
+    const c = { total: feedback.length, Received: 0, 'In Progress': 0, Completed: 0 };
+    feedback.forEach(f => { if (c[f.status] !== undefined) c[f.status]++; });
+    return c;
+  }, [feedback]);
 
   const getTypeIcon = (type) => {
     const icons = {
@@ -107,8 +115,15 @@ const FeedbackList = ({ onViewDetails }) => {
 
   if (loading && feedback.length === 0) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="grid grid-cols-1 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border-2 border-gray-100 p-6 animate-pulse">
+            <div className="h-4 w-40 bg-gray-200 rounded mb-3" />
+            <div className="h-3 w-72 bg-gray-200 rounded mb-2" />
+            <div className="h-3 w-56 bg-gray-200 rounded mb-4" />
+            <div className="h-3 w-24 bg-gray-200 rounded" />
+          </div>
+        ))}
       </div>
     );
   }
@@ -130,23 +145,23 @@ const FeedbackList = ({ onViewDetails }) => {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filters & Search */}
       <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex items-center space-x-2 w-full md:w-auto">
             <Filter className="w-4 h-4 text-gray-400" />
             <select
               value={filters.status}
               onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400"
             >
-              <option value="all">All Status</option>
-              <option value="Received">Received</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
+              <option value="all">All Status ({counts.total})</option>
+              <option value="Received">Received ({counts.Received})</option>
+              <option value="In Progress">In Progress ({counts['In Progress']})</option>
+              <option value="Completed">Completed ({counts.Completed})</option>
             </select>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 w-full md:w-auto">
             <select
               value={filters.type}
               onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
@@ -158,6 +173,12 @@ const FeedbackList = ({ onViewDetails }) => {
               <option value="General Comment">General Comment</option>
             </select>
           </div>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search subject or description..."
+            className="w-full md:flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400"
+          />
         </div>
       </div>
 
@@ -166,11 +187,28 @@ const FeedbackList = ({ onViewDetails }) => {
         <div className="text-center py-12">
           <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-600 mb-2">No feedback found</h3>
-          <p className="text-gray-500">You haven't submitted any feedback yet or no feedback matches your filters</p>
+          <p className="text-gray-500 mb-4">You haven't submitted any feedback yet or no feedback matches your filters</p>
+          {onSwitchToSubmit && (
+            <button
+              onClick={onSwitchToSubmit}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              Submit Feedback
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
-          {feedback.map((item) => {
+          {feedback
+            .filter(item => {
+              if (!query.trim()) return true;
+              const q = query.trim().toLowerCase();
+              return (
+                item.subject?.toLowerCase().includes(q) ||
+                item.description?.toLowerCase().includes(q)
+              );
+            })
+            .map((item) => {
             const TypeIcon = getTypeIcon(item.type);
             const StatusIcon = getStatusIcon(item.status);
             

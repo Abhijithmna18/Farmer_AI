@@ -1,0 +1,143 @@
+{
+  "info": {
+    "name": "FarmerAI Growth Calendar Admin API",
+    "description": "API endpoints for managing growth calendars in the admin dashboard",
+    "_postman_id": "growth-calendar-admin-api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get All Growth Calendars",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/admin/growth-calendar?page=1&limit=10",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "growth-calendar"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Growth Calendar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cropName\": \"Wheat\",\n  \"variety\": \"Durum\",\n  \"plantingDate\": \"2025-10-15T00:00:00.000Z\",\n  \"estimatedHarvestDate\": \"2026-02-15T00:00:00.000Z\",\n  \"season\": \"2025-winter\",\n  \"year\": 2025,\n  \"isActive\": true,\n  \"notes\": \"Winter wheat planting\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/growth-calendar",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "growth-calendar"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Growth Calendar By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/admin/growth-calendar/:id",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "growth-calendar", ":id"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Growth Calendar",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"notes\": \"Updated notes for winter wheat\",\n  \"isActive\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/growth-calendar/:id",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "growth-calendar", ":id"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Growth Calendar",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/admin/growth-calendar/:id",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "growth-calendar", ":id"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5002/api"
+    },
+    {
+      "key": "admin_token",
+      "value": "YOUR_ADMIN_JWT_TOKEN_HERE"
+    }
+  ]
+}

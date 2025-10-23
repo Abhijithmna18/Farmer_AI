@@ -7,6 +7,7 @@ const connectDB = async () => {
     process.env.MONGO_URI || "mongodb://localhost:27017/farmerai";
 
   try {
+    logger.info("Attempting to connect to MongoDB:", mongoUri);
     // Modern connection (no need for deprecated options)
     await mongoose.connect(mongoUri);
 

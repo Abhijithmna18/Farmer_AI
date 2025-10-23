@@ -21,10 +21,7 @@ export const classifyPlant = async (file) => {
   return data;
 };
 
-export const createPlant = async (payload) => {
-  const { data } = await apiClient.post('/plants', payload);
-  return data;
-};
+// already there
 
 export const updatePlant = async (id, payload) => {
   const { data } = await apiClient.put(`/plants/${id}`, payload);
@@ -33,5 +30,18 @@ export const updatePlant = async (id, payload) => {
 
 export const deletePlant = async (id) => {
   const { data } = await apiClient.delete(`/plants/${id}`);
+  return data;
+};
+
+// Create a plant document
+// POST /api/plants
+export const createPlant = async (payload) => {
+  const { data } = await apiClient.post('/plants', payload);
+  return data;
+};
+
+// Fetch enriched details by plant name (no persistence)
+export const fetchPlantDetailsByName = async (name) => {
+  const { data } = await apiClient.get('/plants/details', { params: { name } });
   return data;
 };

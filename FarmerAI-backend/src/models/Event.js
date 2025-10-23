@@ -46,9 +46,9 @@ const EventSchema = new mongoose.Schema(
     capacity: { type: Number, default: 0 },
     visibility: { type: String, enum: ['public', 'private'], default: 'public' },
     price: { type: Number, default: 0 },
-
     recurrence: recurrenceSchema,
     reminders: [reminderSchema],
+    registrationLink: { type: String },
 
     status: {
       type: String,

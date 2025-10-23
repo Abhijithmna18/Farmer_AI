@@ -1,4 +1,5 @@
 // src/config/razorpay.js
+import apiClient from '../services/apiClient';
 export const RAZORPAY_CONFIG = {
   keyId: import.meta.env.VITE_RAZORPAY_KEY_ID,
   currency: 'INR',
@@ -22,58 +23,31 @@ export const loadRazorpayScript = () => {
 
 export const createRazorpayOrder = async (amount, currency = 'INR', bookingId) => {
   try {
-    const response = await fetch('/api/razorpay/create-order', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
-        amount: amount * 100, // Convert to paise
-        currency,
-        bookingId
-      })
+    const { data } = await apiClient.post('/razorpay/create-order', {
+      amount: amount * 100, // Convert to paise
+      currency,
+      bookingId
     });
-
-    const data = await response.json();
-    
-    if (data.success) {
-      return data.data;
-    } else {
-      throw new Error(data.message || 'Failed to create Razorpay order');
-    }
+    if (data?.success) return data.data;
+    throw new Error(data?.message || 'Failed to create Razorpay order');
   } catch (error) {
     console.error('Error creating Razorpay order:', error);
     throw error;
   }
 };
 
-export const verifyPayment = async (bookingId, paymentId, signature) => {
+export const verifyPayment = async (bookingId, razorpay_payment_id, razorpay_signature, razorpay_order_id) => {
   try {
-    const response = await fetch('/api/bookings/verify-payment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
-        bookingId,
-        paymentId,
-        signature
-      })
+    const { data } = await apiClient.post('/warehouse-bookings/verify-payment', {
+      bookingId,
+      razorpay_payment_id,
+      razorpay_signature,
+      razorpay_order_id
     });
-
-    const data = await response.json();
-    
-    if (data.success) {
-      return data.data;
-    } else {
-      throw new Error(data.message || 'Payment verification failed');
-    }
+    if (data?.success) return data.data;
+    throw new Error(data?.message || 'Payment verification failed');
   } catch (error) {
     console.error('Error verifying payment:', error);
     throw error;
   }
 };
-
-

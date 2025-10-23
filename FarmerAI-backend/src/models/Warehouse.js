@@ -81,6 +81,12 @@ const WarehouseSchema = new mongoose.Schema(
         required: true,
         min: 0
       },
+      // New: hourly pricing for tonnage-based bookings
+      hourlyRatePerTon: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
       pricePerUnit: {
         type: String,
         enum: ['per_kg', 'per_ton', 'per_quintal', 'per_bag', 'per_sqft', 'per_cubic_meter', 'per_day', 'per_month'],
@@ -269,7 +275,63 @@ WarehouseSchema.pre('save', function(next) {
   next();
 });
 
+// Static method to get warehouse statistics
+WarehouseSchema.statics.getStats = async function(filters = {}) {
+  const matchStage = {};
+  if (filters.status) matchStage.status = filters.status;
+  if (filters.verified !== undefined) matchStage['verification.status'] = filters.verified ? 'verified' : { $ne: 'verified' };
+  if (filters.city) matchStage['location.city'] = filters.city;
+  if (filters.dateFrom || filters.dateTo) {
+    matchStage.createdAt = {};
+    if (filters.dateFrom) matchStage.createdAt.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) matchStage.createdAt.$lte = new Date(filters.dateTo);
+  }
+
+  const stats = await this.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: null,
+        totalWarehouses: { $sum: 1 },
+        verifiedWarehouses: { $sum: { $cond: [{ $eq: ['$verification.status', 'verified'] }, 1, 0] } },
+        pendingVerification: { $sum: { $cond: [{ $eq: ['$verification.status', 'pending'] }, 1, 0] } },
+        rejectedWarehouses: { $sum: { $cond: [{ $eq: ['$verification.status', 'rejected'] }, 1, 0] } },
+        activeWarehouses: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+        inactiveWarehouses: { $sum: { $cond: [{ $eq: ['$status', 'inactive'] }, 1, 0] } },
+        totalCapacity: { $sum: '$capacity.total' },
+        availableCapacity: { $sum: '$capacity.available' }
+      }
+    }
+  ]);
+
+  return stats[0] || {
+    totalWarehouses: 0,
+    verifiedWarehouses: 0,
+    pendingVerification: 0,
+    rejectedWarehouses: 0,
+    activeWarehouses: 0,
+    inactiveWarehouses: 0,
+    totalCapacity: 0,
+    availableCapacity: 0
+  };
+};
+
 module.exports = mongoose.model('Warehouse', WarehouseSchema);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

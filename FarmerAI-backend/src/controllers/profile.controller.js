@@ -49,15 +49,16 @@ exports.getProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Convert profile picture path to URL if it exists
+    // Convert profile picture path to absolute URL if it exists
     let profilePictureUrl = null;
     if (user.photoURL) {
-      if (user.photoURL.startsWith('http')) {
+      if (String(user.photoURL).startsWith('http')) {
         // External URL (Google profile picture)
         profilePictureUrl = user.photoURL;
       } else {
-        // Local file path
-        profilePictureUrl = `/uploads/profile-pictures/${path.basename(user.photoURL)}`;
+        // Local file path -> absolute URL
+        const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        profilePictureUrl = `${base}/uploads/profile-pictures/${path.basename(String(user.photoURL))}`;
       }
     }
 
@@ -138,13 +139,14 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Convert profile picture path to URL if it exists
+    // Convert profile picture path to absolute URL if it exists
     let profilePictureUrl = null;
     if (user.photoURL) {
-      if (user.photoURL.startsWith('http')) {
+      if (String(user.photoURL).startsWith('http')) {
         profilePictureUrl = user.photoURL;
       } else {
-        profilePictureUrl = `/uploads/profile-pictures/${path.basename(user.photoURL)}`;
+        const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        profilePictureUrl = `${base}/uploads/profile-pictures/${path.basename(String(user.photoURL))}`;
       }
     }
 
@@ -257,7 +259,8 @@ exports.uploadProfilePicture = async (req, res) => {
     user.photoURL = newPhotoURL;
     await user.save();
 
-    const profilePictureUrl = `/uploads/profile-pictures/${path.basename(newPhotoURL)}`;
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const profilePictureUrl = `${base}/uploads/profile-pictures/${path.basename(newPhotoURL)}`;
 
     res.json({
       success: true,
@@ -350,6 +353,297 @@ exports.updateEmail = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating email:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get user statistics and analytics
+exports.getUserStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('farmerProfile buyerProfile warehouseOwnerProfile createdAt');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Calculate basic stats
+    const stats = {
+      accountAge: Math.floor((new Date() - user.createdAt) / (1000 * 60 * 60 * 24)), // days
+      userType: user.userType || 'farmer',
+      verificationStatus: 'unverified'
+    };
+
+    // Add farmer-specific stats
+    if (user.farmerProfile) {
+      stats.farmerStats = {
+        farmSize: user.farmerProfile.farmSize || 0,
+        farmingExperience: user.farmerProfile.farmingExperience || 0,
+        verificationStatus: user.farmerProfile.verificationStatus || 'unverified',
+        totalSales: user.farmerProfile.totalSales || 0,
+        totalOrders: user.farmerProfile.totalOrders || 0,
+        rating: user.farmerProfile.rating || { average: 0, count: 0 },
+        certifications: user.farmerProfile.certifications || []
+      };
+      stats.verificationStatus = user.farmerProfile.verificationStatus || 'unverified';
+    }
+
+    // Add buyer-specific stats
+    if (user.buyerProfile) {
+      stats.buyerStats = {
+        totalPurchases: user.buyerProfile.totalPurchases || 0,
+        totalOrders: user.buyerProfile.totalOrders || 0,
+        rating: user.buyerProfile.rating || { average: 0, count: 0 },
+        addressesCount: user.buyerProfile.addresses ? user.buyerProfile.addresses.length : 0,
+        paymentMethodsCount: user.buyerProfile.paymentMethods ? user.buyerProfile.paymentMethods.length : 0
+      };
+    }
+
+    // Add warehouse owner stats
+    if (user.warehouseOwnerProfile) {
+      stats.warehouseStats = {
+        verificationStatus: user.warehouseOwnerProfile.verificationStatus || 'unverified',
+        totalBookings: user.warehouseOwnerProfile.totalBookings || 0,
+        totalRevenue: user.warehouseOwnerProfile.totalRevenue || 0,
+        rating: user.warehouseOwnerProfile.rating || { average: 0, count: 0 }
+      };
+    }
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Update farmer profile
+exports.updateFarmerProfile = async (req, res) => {
+  try {
+    const {
+      farmName,
+      farmSize,
+      farmLocation,
+      farmingExperience,
+      certifications,
+      bankDetails
+    } = req.body;
+
+    const updateData = {};
+    
+    if (farmName !== undefined) updateData['farmerProfile.farmName'] = farmName;
+    if (farmSize !== undefined) updateData['farmerProfile.farmSize'] = farmSize;
+    if (farmLocation !== undefined) updateData['farmerProfile.farmLocation'] = farmLocation;
+    if (farmingExperience !== undefined) updateData['farmerProfile.farmingExperience'] = farmingExperience;
+    if (certifications !== undefined) updateData['farmerProfile.certifications'] = certifications;
+    if (bankDetails !== undefined) updateData['farmerProfile.bankDetails'] = bankDetails;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password -googleId');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Farmer profile updated successfully',
+      farmerProfile: user.farmerProfile
+    });
+  } catch (error) {
+    console.error('Error updating farmer profile:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: Object.values(error.errors).map(err => err.message) 
+      });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Update buyer profile
+exports.updateBuyerProfile = async (req, res) => {
+  try {
+    const { addresses, paymentMethods, preferences } = req.body;
+
+    const updateData = {};
+    
+    if (addresses !== undefined) updateData['buyerProfile.addresses'] = addresses;
+    if (paymentMethods !== undefined) updateData['buyerProfile.paymentMethods'] = paymentMethods;
+    if (preferences !== undefined) updateData['buyerProfile.preferences'] = preferences;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password -googleId');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Buyer profile updated successfully',
+      buyerProfile: user.buyerProfile
+    });
+  } catch (error) {
+    console.error('Error updating buyer profile:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: Object.values(error.errors).map(err => err.message) 
+      });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Update warehouse owner profile
+exports.updateWarehouseOwnerProfile = async (req, res) => {
+  try {
+    const {
+      businessName,
+      businessType,
+      gstNumber,
+      panNumber,
+      businessAddress,
+      bankDetails
+    } = req.body;
+
+    const updateData = {};
+    
+    if (businessName !== undefined) updateData['warehouseOwnerProfile.businessName'] = businessName;
+    if (businessType !== undefined) updateData['warehouseOwnerProfile.businessType'] = businessType;
+    if (gstNumber !== undefined) updateData['warehouseOwnerProfile.gstNumber'] = gstNumber;
+    if (panNumber !== undefined) updateData['warehouseOwnerProfile.panNumber'] = panNumber;
+    if (businessAddress !== undefined) updateData['warehouseOwnerProfile.businessAddress'] = businessAddress;
+    if (bankDetails !== undefined) updateData['warehouseOwnerProfile.bankDetails'] = bankDetails;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password -googleId');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Warehouse owner profile updated successfully',
+      warehouseOwnerProfile: user.warehouseOwnerProfile
+    });
+  } catch (error) {
+    console.error('Error updating warehouse owner profile:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: Object.values(error.errors).map(err => err.message) 
+      });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Upload verification documents
+exports.uploadVerificationDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const { documentType } = req.body;
+    if (!documentType) {
+      return res.status(400).json({ message: 'Document type is required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const documentData = {
+      type: documentType,
+      url: `/uploads/verification-documents/${path.basename(req.file.path)}`,
+      uploadedAt: new Date()
+    };
+
+    // Add to appropriate profile based on user type
+    if (user.userType === 'farmer' || user.userType === 'both') {
+      if (!user.farmerProfile) user.farmerProfile = {};
+      if (!user.farmerProfile.verificationDocuments) user.farmerProfile.verificationDocuments = [];
+      user.farmerProfile.verificationDocuments.push(documentData);
+    } else if (user.userType === 'warehouse-owner') {
+      if (!user.warehouseOwnerProfile) user.warehouseOwnerProfile = {};
+      if (!user.warehouseOwnerProfile.verificationDocuments) user.warehouseOwnerProfile.verificationDocuments = [];
+      user.warehouseOwnerProfile.verificationDocuments.push(documentData);
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Verification document uploaded successfully',
+      document: documentData
+    });
+  } catch (error) {
+    console.error('Error uploading verification document:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get user activity feed
+exports.getActivityFeed = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    // This would typically fetch from an activity log collection
+    // For now, we'll return a mock activity feed
+    const activities = [
+      {
+        id: '1',
+        type: 'profile_updated',
+        message: 'Profile information updated',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        icon: '👤'
+      },
+      {
+        id: '2',
+        type: 'crop_recommendation',
+        message: 'Received crop recommendation for rice',
+        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+        icon: '🌱'
+      },
+      {
+        id: '3',
+        type: 'weather_alert',
+        message: 'Weather alert: Heavy rain expected',
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+        icon: '🌧️'
+      }
+    ];
+
+    res.json({
+      success: true,
+      activities,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: activities.length,
+        pages: Math.ceil(activities.length / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching activity feed:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

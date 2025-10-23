@@ -1,0 +1,55 @@
+# Farm Monitoring API Tests
+# Use this file with REST Client extension in VS Code
+# Or copy-paste the curl commands to terminal
+
+### 1. Get JWT Token from browser console first:
+# Open browser DevTools (F12) → Console → Run: localStorage.getItem('token')
+# Then replace YOUR_TOKEN_HERE below with your actual token
+
+@baseUrl = http://localhost:5000/api
+@token = YOUR_TOKEN_HERE
+
+### 2. Manually Add Test Sensor Data (Bypass Adafruit IO)
+POST {{baseUrl}}/farm-monitoring/add
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "temperature": 28.5,
+  "humidity": 65.0,
+  "soilMoisture": 450
+}
+
+### 3. Get Latest Reading
+GET {{baseUrl}}/farm-monitoring/latest
+Authorization: Bearer {{token}}
+
+### 4. Get Historical Data (Last 24 hours)
+GET {{baseUrl}}/farm-monitoring/history?hours=24&limit=100
+Authorization: Bearer {{token}}
+
+### 5. Get Statistics
+GET {{baseUrl}}/farm-monitoring/stats?hours=24
+Authorization: Bearer {{token}}
+
+### 6. Fetch from Adafruit IO
+POST {{baseUrl}}/farm-monitoring/fetch
+Authorization: Bearer {{token}}
+
+###############################################
+# CURL Commands (if you prefer terminal)
+###############################################
+
+### Add Test Data
+# curl -X POST http://localhost:5000/api/farm-monitoring/add \
+#   -H "Authorization: Bearer YOUR_TOKEN" \
+#   -H "Content-Type: application/json" \
+#   -d '{"temperature":28.5,"humidity":65.0,"soilMoisture":450}'
+
+### Get Latest
+# curl http://localhost:5000/api/farm-monitoring/latest \
+#   -H "Authorization: Bearer YOUR_TOKEN"
+
+### Get History
+# curl "http://localhost:5000/api/farm-monitoring/history?hours=24&limit=100" \
+#   -H "Authorization: Bearer YOUR_TOKEN"

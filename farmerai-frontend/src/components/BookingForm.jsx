@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, CalendarIcon, CurrencyRupeeIcon } from '@heroicons/react/24/outline';
 import { gsap } from 'gsap';
+import apiClient from '../services/apiClient';
 
 const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
   const [formData, setFormData] = useState({
@@ -48,6 +49,10 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
     }
   };
 
+  const minDays = Math.max(1, Number(warehouse?.pricing?.minimumDays || 1));
+  const availableCapacity = Number(warehouse?.capacity?.available || 0); // in same unit as UI (tons)
+  const basePrice = Number(warehouse?.pricing?.basePrice || 0);
+
   const calculateTotal = () => {
     const quantity = parseFloat(formData.quantity) || 0;
     const startDate = new Date(formData.startDate);
@@ -55,7 +60,6 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
     
     if (startDate && endDate && endDate > startDate) {
       const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-      const basePrice = warehouse?.pricing?.basePrice || 0;
       return days * basePrice * quantity;
     }
     return 0;
@@ -70,6 +74,9 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
 
     if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
       newErrors.quantity = 'Please enter a valid quantity';
+    }
+    if (availableCapacity > 0 && parseFloat(formData.quantity) > availableCapacity) {
+      newErrors.quantity = `Quantity exceeds available capacity (${availableCapacity} ${warehouse?.capacity?.unit || 'tons'})`;
     }
 
     if (!formData.startDate) {
@@ -92,6 +99,11 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
 
       if (endDate <= startDate) {
         newErrors.endDate = 'End date must be after start date';
+      }
+
+      const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      if (!newErrors.endDate && days < minDays) {
+        newErrors.endDate = `Minimum booking is ${minDays} day${minDays>1?'s':''}`;
       }
     }
 
@@ -125,24 +137,36 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
         notes: formData.notes
       };
 
-      // Create booking first
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      // Create booking via backend API base
+      const { data } = await apiClient.post('/warehouse-bookings/book', {
+        warehouseId: bookingData.warehouseId,
+        produce: {
+          type: bookingData.produceType,
+          quantity: bookingData.quantity,
+          unit: 'kg',
+          quality: 'good',
+          description: bookingData.notes
         },
-        body: JSON.stringify(bookingData)
+        storageRequirements: {
+          storageType: 'general'
+        },
+        bookingDates: {
+          startDate: bookingData.startDate,
+          endDate: bookingData.endDate
+        },
+        notes: bookingData.notes
       });
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (data?.success) {
         // Redirect to payment page or show payment modal
-        const bookingId = data.data._id;
-        window.location.href = `/dashboard/payment/${bookingId}`;
+        const bookingId = data?.data?.booking?._id || data?.data?._id;
+        if (bookingId) {
+          window.location.href = `/payment/${bookingId}`;
+        } else {
+          throw new Error('Booking created, but response missing booking ID');
+        }
       } else {
-        throw new Error(data.message || 'Failed to create booking');
+        throw new Error(data?.message || 'Failed to create booking');
       }
     } catch (error) {
       console.error('Error submitting booking:', error);
@@ -171,18 +195,19 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={handleClose} />
-      
-      <div className="booking-modal relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-slate-800/60 to-slate-900/70 backdrop-blur-sm" onClick={handleClose} />
+
+      <div className="booking-modal relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl border border-white/30 bg-white/20 backdrop-blur-xl shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-white/30 bg-white/10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Book Warehouse</h2>
-            <p className="text-gray-600 mt-1">{warehouse?.name}</p>
+            <h2 className="text-2xl font-bold text-gray-900 drop-shadow-sm">Book Warehouse</h2>
+            <p className="text-gray-700 mt-1">{warehouse?.name}</p>
+            <div className="text-xs text-gray-600 mt-1">Minimum {minDays} day{minDays>1?'s':''} • Available: {availableCapacity} {warehouse?.capacity?.unit || 'tons'} • ₹{basePrice}/day</div>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-gray-600 hover:text-gray-800 rounded-lg transition-colors border border-white/40 bg-white/40 hover:bg-white/60"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -192,15 +217,15 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Produce Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-800 mb-2">
               Type of Produce *
             </label>
             <select
               name="produceType"
               value={formData.produceType}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                errors.produceType ? 'border-red-300' : 'border-gray-300'
+              className={`w-full px-3 py-2 border rounded-lg bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                errors.produceType ? 'border-red-300' : 'border-white/60'
               }`}
             >
               <option value="">Select produce type</option>
@@ -219,7 +244,7 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
 
           {/* Quantity */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-800 mb-2">
               Quantity (in tons) *
             </label>
             <input
@@ -230,8 +255,8 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
               min="0.1"
               step="0.1"
               placeholder="Enter quantity in tons"
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                errors.quantity ? 'border-red-300' : 'border-gray-300'
+              className={`w-full px-3 py-2 border rounded-lg bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                errors.quantity ? 'border-red-300' : 'border-white/60'
               }`}
             />
             {errors.quantity && (
@@ -242,7 +267,7 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
           {/* Date Range */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-800 mb-2">
                 Start Date *
               </label>
               <input
@@ -251,8 +276,8 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
                 value={formData.startDate}
                 onChange={handleInputChange}
                 min={new Date().toISOString().split('T')[0]}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                  errors.startDate ? 'border-red-300' : 'border-gray-300'
+                className={`w-full px-3 py-2 border rounded-lg bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                  errors.startDate ? 'border-red-300' : 'border-white/60'
                 }`}
               />
               {errors.startDate && (
@@ -261,7 +286,7 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-800 mb-2">
                 End Date *
               </label>
               <input
@@ -270,8 +295,8 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
                 value={formData.endDate}
                 onChange={handleInputChange}
                 min={formData.startDate || new Date().toISOString().split('T')[0]}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                  errors.endDate ? 'border-red-300' : 'border-gray-300'
+                className={`w-full px-3 py-2 border rounded-lg bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                  errors.endDate ? 'border-red-300' : 'border-white/60'
                 }`}
               />
               {errors.endDate && (
@@ -282,7 +307,7 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-800 mb-2">
               Additional Notes
             </label>
             <textarea
@@ -291,18 +316,18 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
               onChange={handleInputChange}
               rows={3}
               placeholder="Any special requirements or notes..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-white/60 bg-white/50 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
 
           {/* Pricing Summary */}
           {totalAmount > 0 && (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="rounded-lg p-4 border border-white/40 bg-white/40 backdrop-blur-sm">
               <h3 className="font-medium text-gray-900 mb-3">Booking Summary</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Price per day:</span>
-                  <span>₹{warehouse?.pricing?.basePrice || 0}</span>
+                  <span>₹{basePrice}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Quantity:</span>
@@ -311,6 +336,10 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Duration:</span>
                   <span>{duration} days</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Minimum days:</span>
+                  <span>{minDays}</span>
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex justify-between font-semibold text-lg">
@@ -323,18 +352,18 @@ const BookingForm = ({ isOpen, onClose, warehouse, onBook }) => {
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-white/30">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-gray-800 border border-white/50 rounded-lg hover:bg-white/50 backdrop-blur-sm transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || totalAmount <= 0}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+              className="px-6 py-2 bg-green-600/90 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center shadow"
             >
               {isSubmitting ? (
                 <>

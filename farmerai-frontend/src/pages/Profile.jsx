@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import PageHeader from "../components/PageHeader";
 import Section from "../components/Section";
@@ -59,6 +60,17 @@ export default function Profile() {
 		load();
 	}, [user, setUser]);
 
+	// Reset saving state if it gets stuck
+	useEffect(() => {
+		if (saving) {
+			const timeout = setTimeout(() => {
+				console.warn("Saving state was stuck, resetting...");
+				setSaving(false);
+			}, 10000); // 10 second timeout
+			return () => clearTimeout(timeout);
+		}
+	}, [saving]);
+
 	const previewUrl = useMemo(() => {
 		if (form.photoFile) return URL.createObjectURL(form.photoFile);
 		return user?.photoURL || "/vite.svg";
@@ -108,7 +120,9 @@ export default function Profile() {
 		try {
 			setSaving(true);
 			const res = await uploadProfilePicture(form.photoFile);
-			setUser((prev) => ({ ...(prev || {}), photoURL: res.photoURL }));
+			// Ensure cache is busted so new image shows immediately everywhere
+			const cacheBustedUrl = res?.photoURL ? `${res.photoURL}${res.photoURL.includes('?') ? '&' : '?'}v=${Date.now()}` : null;
+			setUser((prev) => ({ ...(prev || {}), photoURL: cacheBustedUrl }));
 			update("photoFile", null);
 			setToast({ type: "success", message: "Profile picture updated." });
 		} catch (err) {
@@ -144,6 +158,7 @@ export default function Profile() {
 
 	const onSave = async (e) => {
 		e.preventDefault();
+		if (saving) return; // Prevent double submission
 		// Basic validation
 		if (!/^[A-Za-z]{2,}$/.test(form.firstName || "")) {
 			setToast({ type: "error", message: "First name is required and must be letters only." });
@@ -163,6 +178,7 @@ export default function Profile() {
 		}
 		try {
 			setSaving(true);
+			console.log("Saving profile...", { firstName: form.firstName, lastName: form.lastName });
 			const payload = {
 				firstName: form.firstName,
 				lastName: form.lastName,
@@ -176,6 +192,7 @@ export default function Profile() {
 				language: form.language,
 			};
 			const updated = await apiUpdateProfile(payload);
+			console.log("Profile saved successfully", updated);
 			setUser((prev) => ({ ...(prev || {}), ...updated }));
 			setToast({ type: "success", message: "Profile saved successfully." });
 		} catch (err) {
@@ -183,6 +200,7 @@ export default function Profile() {
 			setToast({ type: "error", message: err?.response?.data?.message || err.message || "Failed to save profile." });
 		} finally {
 			setSaving(false);
+			console.log("Saving state reset to false");
 		}
 	};
 
@@ -194,6 +212,30 @@ export default function Profile() {
 				subtitle="Edit your personal information, farm preferences, and security settings."
 				icon="👤"
 			/>
+
+			{/* Enhanced Dashboard Link */}
+			<div className="mb-6">
+				<div className="bg-gradient-to-r from-green-50 to-blue-50 backdrop-blur-xl p-6 rounded-3xl border-2 border-green-100 border-opacity-60 shadow-[0_25px_60px_-15px_rgba(76,175,80,0.18)]">
+					<div className="flex items-center justify-between">
+						<div>
+							<h3 className="text-xl font-bold text-gray-800 mb-2">🚀 Enhanced Profile Dashboard</h3>
+							<p className="text-gray-600 mb-4">Access advanced profile management with comprehensive statistics, role-specific settings, and activity tracking.</p>
+							<div className="flex flex-wrap gap-2 mb-4">
+								<span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">📊 Analytics</span>
+								<span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">⚙️ Advanced Settings</span>
+								<span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">🔒 Security</span>
+								<span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">📈 Activity Feed</span>
+							</div>
+						</div>
+						<Link
+							to="/profile-dashboard"
+							className="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl hover:from-green-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+						>
+							Open Enhanced Dashboard →
+						</Link>
+					</div>
+				</div>
+			</div>
 
 			<form onSubmit={onSave}>
 				{/* Progress Bar */}
@@ -216,21 +258,23 @@ export default function Profile() {
 						</button>
 						{sectionsOpen.basic && (
 						<div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-							<div className="relative">
+                            <div className="relative">
 								<img src={previewUrl} alt="Profile avatar" className="w-24 h-24 rounded-full object-cover border-2 border-green-100" />
 								<div className="mt-2 flex gap-2">
 									<button type="button" onClick={onPickPhoto} className="px-3 py-1.5 text-sm bg-white/80 backdrop-blur rounded-lg border border-green-100 hover:bg-green-50 transition disabled:opacity-60" aria-label="Choose profile picture" disabled={saving}>Choose</button>
 									<button type="button" onClick={onUploadPhoto} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-60" aria-label="Upload profile picture" disabled={saving || !form.photoFile}>Save</button>
 									<button type="button" onClick={onRemovePhoto} className="px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg border border-red-200 hover:bg-red-100 transition disabled:opacity-60" aria-label="Remove profile picture" disabled={saving || !user?.photoURL}>Remove</button>
 								</div>
-								<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoChange} />
+                                <label htmlFor="profileImage" className="sr-only">Upload Profile Image</label>
+                                <input id="profileImage" ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoChange} aria-label="Upload Profile Image" />
 							</div>
 
 							<div className="w-full">
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                                    <div>
+                                        <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
 										<input
+                                            id="firstName"
 											value={form.firstName}
 											onChange={(e) => update("firstName", e.target.value)}
 											className="w-full px-4 py-3 rounded-xl bg-white/90 backdrop-blur-md border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30 transition"
@@ -239,9 +283,10 @@ export default function Profile() {
 											title="First name must contain only letters and be at least 2 characters"
 										/>
 									</div>
-									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                                    <div>
+                                        <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
 										<input
+                                            id="lastName"
 											value={form.lastName}
 											onChange={(e) => update("lastName", e.target.value)}
 											className="w-full px-4 py-3 rounded-xl bg-white/90 backdrop-blur-md border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30 transition"
@@ -252,8 +297,9 @@ export default function Profile() {
 									</div>
 								</div>
 
-								<label className="block text-sm font-medium text-gray-700 mt-4 mb-1">Email</label>
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mt-4 mb-1">Email</label>
 								<input
+                                    id="email"
 									type="email"
 									value={form.email}
 									onChange={(e) => update("email", e.target.value)}
@@ -276,21 +322,21 @@ export default function Profile() {
 						</button>
 						{sectionsOpen.personal && (
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-									<input value={form.location} onChange={(e) => update("location", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} />
+                                <div>
+                                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                    <input id="location" value={form.location} onChange={(e) => update("location", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} placeholder="City / Area" />
 								</div>
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-									<input value={form.state} onChange={(e) => update("state", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} />
+                                    <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    <input id="state" value={form.state} onChange={(e) => update("state", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} />
 								</div>
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-									<input value={form.district} onChange={(e) => update("district", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} />
+                                    <label htmlFor="district" className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                                    <input id="district" value={form.district} onChange={(e) => update("district", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} />
 								</div>
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
-									<input value={form.pincode} onChange={(e) => update("pincode", e.target.value.replace(/[^\d]/g, "").slice(0,6))} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} inputMode="numeric" placeholder="6-digit code" />
+                                    <label htmlFor="pincode" className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                                    <input id="pincode" value={form.pincode} onChange={(e) => update("pincode", e.target.value.replace(/[^\d]/g, "").slice(0,6))} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving} inputMode="numeric" placeholder="6-digit code" />
 								</div>
 							</div>
 						)}
@@ -300,9 +346,9 @@ export default function Profile() {
 					<div className="bg-white/90 backdrop-blur-xl p-6 md:p-8 rounded-3xl border-2 border-green-100 border-opacity-60 shadow-[0_25px_60px_-15px_rgba(76,175,80,0.18)]">
 						<h3 className="text-lg font-semibold text-gray-800 mb-4">Farm Preferences</h3>
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<div>
-								<label className="block text-sm font-medium text-gray-700 mb-1">Soil Type</label>
-								<select value={form.soilType} onChange={(e) => update("soilType", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving}>
+                            <div>
+                                <label htmlFor="soilType" className="block text-sm font-medium text-gray-700 mb-1">Soil Type</label>
+                                <select id="soilType" value={form.soilType} onChange={(e) => update("soilType", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving}>
 									<option>Loamy</option>
 									<option>Sandy</option>
 									<option>Clay</option>
@@ -312,7 +358,7 @@ export default function Profile() {
 								</select>
 							</div>
 							<div>
-								<label className="block text-sm font-medium text-gray-700 mb-1">Crops of Interest</label>
+                                <label htmlFor="cropsInput" className="block text-sm font-medium text-gray-700 mb-1">Crops of Interest</label>
 								<div className="flex flex-wrap gap-2 mb-2">
 									{form.crops.map((crop) => (
 										<span key={crop} className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded-full border border-green-200">
@@ -321,7 +367,8 @@ export default function Profile() {
 										</span>
 									))}
 								</div>
-								<input
+                                <input
+                                    id="cropsInput"
 									placeholder="Type a crop and press Enter"
 									onKeyDown={onCropsKeyDown}
 									className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30"
@@ -329,8 +376,8 @@ export default function Profile() {
 								/>
 							</div>
 							<div>
-								<label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
-								<select value={form.language} onChange={(e) => update("language", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving}>
+                                <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                                <select id="language" value={form.language} onChange={(e) => update("language", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white/90 border-2 border-green-100 focus:border-green-400 focus:ring-2 focus:ring-green-400/30" disabled={saving}>
 									<option>English</option>
 									<option>Hindi</option>
 									<option>Kannada</option>

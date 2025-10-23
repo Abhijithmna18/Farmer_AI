@@ -265,3 +265,18 @@ useEffect(() => {
 5. **Use refs** for values that don't need to trigger re-renders
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

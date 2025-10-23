@@ -17,12 +17,15 @@ async function createTestUser() {
     if (!existingUser) {
       const hashedPassword = await bcrypt.hash(testPassword, 10);
       const testUser = new User({
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: testEmail,
         password: hashedPassword,
         roles: ['farmer'],
         userType: 'farmer',
+        isEmailVerified: true,
         verified: true,
+        isVerified: true,
       });
       await testUser.save();
       console.log('✅ Test user created successfully!');

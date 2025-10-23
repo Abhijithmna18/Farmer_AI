@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from "react";
 import { gsap } from "gsap";
+import { Leaf, Home } from "lucide-react";
 import InputField from "../components/InputField";
 import PasswordField from "../components/PasswordField";
 import PhoneField from "../components/PhoneField";
@@ -152,14 +153,20 @@ export default function Register() {
     e.preventDefault();
     setIsLoading(true);
 
-    const nameRegex = /^[A-Za-z]{2,}$/;
-    if (!form.firstName || form.firstName.length < 2 || !nameRegex.test(form.firstName)) {
-      setToast({ message: "Enter a valid first name (at least 2 letters only)", type: "error" });
+    // Normalize and validate names
+    const first = (form.firstName || '').trim();
+    const last = (form.lastName || '').trim();
+    // Allow letters, spaces, hyphens, apostrophes, and dots. Must start with a letter and be at least 2 chars.
+    const nameRegex = /^[A-Za-z][A-Za-z .'-]{1,}$/;
+    const firstLettersCount = (first.match(/[A-Za-z]/g) || []).length;
+    if (!first || firstLettersCount < 2 || !nameRegex.test(first)) {
+      setToast({ message: "Enter a valid first name (min 2 letters)", type: "error" });
       setIsLoading(false);
       return;
     }
-    if (!form.lastName || form.lastName.length < 2 || !nameRegex.test(form.lastName)) {
-      setToast({ message: "Enter a valid last name (at least 2 letters only)", type: "error" });
+    const lastLettersCount = (last.match(/[A-Za-z]/g) || []).length;
+    if (!last || lastLettersCount < 2 || !nameRegex.test(last)) {
+      setToast({ message: "Enter a valid last name (min 2 letters)", type: "error" });
       setIsLoading(false);
       return;
     }
@@ -182,8 +189,8 @@ export default function Register() {
 
     try {
       const res = await apiClient.post('/auth/register', {
-        firstName: form.firstName,
-        lastName: form.lastName,
+        firstName: first,
+        lastName: last,
         email: form.email,
         password: form.password || undefined,
         confirmPassword: form.password ? form.confirmPassword : undefined,
@@ -238,13 +245,35 @@ export default function Register() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 hidden-until-ready"
+      className="min-h-screen flex items-center justify-center p-4 hidden-until-ready relative"
       style={{
         background: "linear-gradient(135deg, #e8f5e8 0%, #f0f9eb 25%, #e6f4ea 50%, #d4ede1 75%, #c8e6c8 100%)",
         backgroundSize: "400% 400%",
         animation: "gradientShift 15s ease infinite"
       }}
     >
+      {/* Decorative plant background image */}
+      <div 
+        className="absolute inset-0 opacity-10 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/New Crop Variety.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(1px)"
+        }}
+      ></div>
+      
+      {/* Fixed Home Button */}
+      <button
+        onClick={() => nav("/")}
+        className="fixed top-6 left-6 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-sm hover:bg-white transition-all duration-300 rounded-full px-4 py-2 shadow-lg hover:shadow-xl border border-green-200 group"
+        aria-label="Go to Home"
+      >
+        <Home className="w-4 h-4 text-green-600 group-hover:text-green-700 transition-colors" />
+        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+          Home
+        </span>
+      </button>
       {/* Decorative leaves */}
       {[...Array(4)].map((_, i) => (
         <div
@@ -269,7 +298,7 @@ export default function Register() {
         className={`w-full max-w-md bg-white bg-opacity-90 backdrop-blur-xl
                   rounded-3xl border-2 border-green-100 border-opacity-60
                   shadow-[0_25px_60px_-15px_rgba(76,175,80,0.25)] 
-                  p-8 relative overflow-hidden z-10`}
+                  p-8 relative overflow-hidden z-20`}
         style={{ opacity: 0 }}
       >
         {/* Decorative accents */}

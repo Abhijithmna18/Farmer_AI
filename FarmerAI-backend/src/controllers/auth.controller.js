@@ -2,6 +2,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const path = require('path');
 const User = require('../models/User');
 const { sendWelcomeEmail, sendThankYouEmail, sendEmail } = require('../services/email.service');
 const { generateOTP, sendOTPEmail, isOTPValid, clearOTP } = require('../services/otp.service');
@@ -342,11 +343,36 @@ exports.forgotPassword = async (req, res, next) => {
 exports.getProfile = async (req, res, next) => {
   try {
     console.log('getProfile called');
-    const user = req.user;
+    const userFromToken = req.user;
     
-    if (!user) {
+    if (!userFromToken) {
       console.error('No user attached to request in getProfile');
       return res.status(401).json({ message: 'Authentication error: no user found.' });
+    }
+
+    // Handle special admin case (hardcoded admin with id='admin')
+    if (userFromToken._id === 'admin' || userFromToken.id === 'admin') {
+      return res.json({ 
+        success: true,
+        user: { 
+          id: 'admin',
+          _id: 'admin',
+          email: userFromToken.email || 'abhijithmnair2002@gmail.com',
+          role: 'admin',
+          roles: ['admin'],
+          userType: 'admin',
+          firstName: 'Admin',
+          lastName: 'User',
+          name: 'Admin User',
+          photoURL: null
+        } 
+      });
+    }
+
+    // Always fetch the latest full user document to include fields like photoURL
+    const user = await User.findById(userFromToken._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     // Migration logic: if user has name but no firstName/lastName, split it
@@ -367,6 +393,17 @@ exports.getProfile = async (req, res, next) => {
       ? 'admin'
       : (user.role || (Array.isArray(user.roles) && user.roles[0]) || user.userType || 'farmer');
 
+    // Normalize photoURL: if it's a local file path, serve as absolute public URL
+    let profilePictureUrl = null;
+    if (user.photoURL) {
+      if (String(user.photoURL).startsWith('http')) {
+        profilePictureUrl = user.photoURL;
+      } else {
+        const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        profilePictureUrl = `${base}/uploads/profile-pictures/${path.basename(String(user.photoURL))}`;
+      }
+    }
+
     return res.json({ 
       success: true,
       user: { 
@@ -377,7 +414,8 @@ exports.getProfile = async (req, res, next) => {
         userType: user.userType,
         firstName: user.firstName,
         lastName: user.lastName,
-        name: user.name || `${user.firstName} ${user.lastName}`.trim()
+        name: user.name || `${user.firstName} ${user.lastName}`.trim(),
+        photoURL: profilePictureUrl
       } 
     });
   } catch (err) {

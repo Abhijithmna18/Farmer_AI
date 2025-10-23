@@ -1,7 +1,11 @@
 // src/components/BookingModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { loadRazorpayScript, createRazorpayOrder, verifyPayment } from '../config/razorpay';
 import { XMarkIcon, CalendarIcon, CurrencyRupeeIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { gsap } from 'gsap';
+import apiClient from '../services/apiClient';
+import { auth } from '../firebase';
 
 const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
   const [formData, setFormData] = useState({
@@ -29,6 +33,7 @@ const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
   const [errors, setErrors] = useState({});
   const modalRef = useRef(null);
   const backdropRef = useRef(null);
+  const navigate = useNavigate();
 
   const produceTypes = [
     'Wheat', 'Rice', 'Corn', 'Soybean', 'Cotton', 'Sugarcane', 'Potato', 'Tomato',
@@ -134,10 +139,16 @@ const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
 
     setIsCalculating(true);
     try {
-      const response = await fetch(`/api/warehouses/${warehouse._id}/availability?startDate=${formData.bookingDates.startDate}&endDate=${formData.bookingDates.endDate}&quantity=${formData.produce.quantity}`);
-      const data = await response.json();
-      
-      if (data.success) {
+      const { data } = await apiClient.get(`/warehouse-bookings/warehouse/${warehouse._id}/availability`, {
+        params: {
+          startDate: formData.bookingDates.startDate,
+          endDate: formData.bookingDates.endDate,
+          quantity: formData.produce.quantity,
+        }
+      });
+      if (data?.success && data?.data?.price?.totalPrice) {
+        setCalculatedPrice(data.data.price.totalPrice);
+      } else if (data?.success && typeof data?.data?.price === 'number') {
         setCalculatedPrice(data.data.price);
       }
     } catch (error) {
@@ -184,15 +195,101 @@ const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onBook({
-        warehouseId: warehouse._id,
-        produce: formData.produce,
-        storageRequirements: formData.storageRequirements,
-        bookingDates: formData.bookingDates
-      });
+      try {
+        const { data } = await apiClient.post('/warehouse-bookings/book', {
+          warehouseId: warehouse._id,
+          produce: formData.produce,
+          storageRequirements: formData.storageRequirements,
+          bookingDates: formData.bookingDates,
+          notes: formData.produce.description
+        });
+
+        if (data?.success) {
+          onBook(data.data);
+          const booking = data?.data?.booking || data?.data;
+          const bookingId = booking?._id;
+          const paymentUrl = data?.data?.paymentUrl;
+          if (paymentUrl) {
+            // External checkout URL (e.g., hosted page)
+            window.location.href = paymentUrl;
+          } else if (bookingId) {
+            // Open Razorpay checkout directly
+            try {
+              // Refresh Firebase token before payment
+              console.log('🔄 Refreshing Firebase token before payment...');
+              const currentUser = auth.currentUser;
+              if (currentUser) {
+                try {
+                  const freshToken = await currentUser.getIdToken(true);
+                  localStorage.setItem('token', freshToken);
+                  console.log('✅ Token refreshed successfully');
+                } catch (tokenError) {
+                  console.error('❌ Failed to refresh token:', tokenError);
+                  throw new Error('Authentication failed. Please login again.');
+                }
+              }
+              
+              const scriptLoaded = await loadRazorpayScript();
+              if (!scriptLoaded) throw new Error('Failed to load Razorpay script');
+
+              const amount = booking?.pricing?.totalAmount || Number(calculatedPrice) || 0;
+              if (!amount) throw new Error('Unable to determine payment amount');
+
+              const orderData = await createRazorpayOrder(amount, 'INR', bookingId);
+              if (!orderData?.id) {
+                console.error('Razorpay order missing id:', orderData);
+                throw new Error('Invalid Razorpay order response');
+              }
+
+              const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+                amount: amount * 100,
+                currency: 'INR',
+                name: 'FarmerAI',
+                description: booking?.warehouse?.name ? `Booking for ${booking.warehouse.name}` : 'Warehouse Booking',
+                order_id: orderData.id,
+                handler: async function (response) {
+                  try {
+                    await verifyPayment(
+                      bookingId, 
+                      response.razorpay_payment_id, 
+                      response.razorpay_signature,
+                      response.razorpay_order_id
+                    );
+                    navigate('/my-bookings');
+                  } catch (err) {
+                    console.error('Payment verification failed:', err);
+                    // stay on modal; user can retry
+                  }
+                },
+                theme: { color: '#10B981' },
+                modal: {
+                  ondismiss: () => {
+                    // User closed the payment modal; keep them on the booking modal
+                  }
+                }
+              };
+
+              const rzp = new window.Razorpay(options);
+              rzp.open();
+            } catch (err) {
+              console.error('Razorpay init error:', err);
+              // As a fallback, navigate to internal payment page
+              navigate(`/payment/${bookingId}`);
+            }
+          } else {
+            console.error('No bookingId or paymentUrl returned from booking API:', data);
+          }
+        } else {
+          console.error('Booking failed:', data?.message);
+        }
+      } catch (error) {
+        console.error('Error creating booking:', error);
+        // Handle error - show toast or error message
+      }
     }
   };
 
@@ -495,6 +592,19 @@ const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
 };
 
 export default BookingModal;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

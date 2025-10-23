@@ -1,394 +1,278 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { 
-  Calendar, 
-  Plus, 
-  BarChart3, 
-  Download, 
-  Upload, 
-  Users, 
-  Settings,
-  ArrowLeft,
-  Cloud,
-  Bell,
-  MapPin,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Edit,
-  Trash2,
-  Share2
-} from 'lucide-react';
-
-import PageHeader from '../components/PageHeader';
-import CalendarView from '../components/CalendarView';
-import CalendarAnalytics from '../components/CalendarAnalytics';
-import RotationRecommendations from '../components/growth-calendar/RotationRecommendations';
-import { updateGrowthCalendar } from '../services/calendarService';
-import Toast from '../components/Toast';
-import { 
-  getGrowthCalendarById, 
-  addCropEvent, 
-  updateCropEvent, 
+  getGrowthCalendarById,
+  addCropEvent,
+  updateCropEvent,
   deleteCropEvent,
   getCalendarAnalytics,
   getWeatherSuggestions,
-  exportCalendar,
-  importCalendar,
-  inviteCollaborator
+  generateAISchedule,
+  predictYield,
 } from '../services/calendarService';
+import PageHeader from '../components/PageHeader';
+import StageCard from '../components/StageCard';
+import CalendarView from '../components/CalendarView';
+import CalendarAnalytics from '../components/CalendarAnalytics';
+import { ArrowLeft } from 'lucide-react';
+import { gsap } from 'gsap';
+import { createTask } from '../services/taskService';
+import { createReminder } from '../services/reminderService';
+import { toast } from 'react-hot-toast';
 
 const GrowthCalendarDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  
   const [calendar, setCalendar] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [activeTab, setActiveTab] = useState('calendar');
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [showCollaboratorModal, setShowCollaboratorModal] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [analytics, setAnalytics] = useState(null);
+  const [aiBanner, setAiBanner] = useState(null);
+
+  const timelineRef = useRef(null);
 
   useEffect(() => {
+    const fetchCalendar = async () => {
+      try {
+        setLoading(true);
+        const data = await getGrowthCalendarById(id);
+        setCalendar(data);
+        
+        // Determine active stage
+        const today = new Date();
+        const activeStageIndex = data.stages.findIndex(stage => {
+          const startDate = new Date(stage.startDate);
+          const endDate = new Date(stage.endDate);
+          return today >= startDate && today <= endDate;
+        });
+        setActiveIndex(activeStageIndex !== -1 ? activeStageIndex : 0);
+
+        // Load analytics
+        try {
+          const a = await getCalendarAnalytics(id);
+          setAnalytics(a);
+        } catch (_) {}
+
+        // AI: generate schedule suggestion banner if missing events
+        if (!data.cropEvents || data.cropEvents.length === 0) {
+          try {
+            const schedule = await generateAISchedule({
+              cropName: data.cropName,
+              soilType: data?.location?.soilType || 'loam',
+              region: data?.regionalClimate || 'temperate',
+              plantingDate: data.plantingDate,
+            });
+            setAiBanner({
+              message: `AI generated a recommended schedule with ${schedule?.schedule?.length || 0} tasks. Click to apply.`,
+              schedule,
+            });
+          } catch (_) {}
+        }
+
+      } catch (err) {
+        setError(err.message || 'Failed to fetch calendar details');
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchCalendar();
   }, [id]);
 
-  const fetchCalendar = async () => {
-    try {
-      setLoading(true);
-      const response = await getGrowthCalendarById(id);
-      setCalendar(response.data);
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch calendar');
-      console.error('Error fetching calendar:', err);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!loading && calendar) {
+      gsap.fromTo(timelineRef.current.children, 
+        { y: 50, opacity: 0 }, 
+        { y: 0, opacity: 1, duration: 0.5, stagger: 0.1, ease: 'power3.out' }
+      );
     }
-  };
+  }, [loading, calendar]);
 
-  const fetchAnalytics = async () => {
-    try {
-      const response = await getCalendarAnalytics(id);
-      setAnalytics(response.data);
-    } catch (err) {
-      console.error('Error fetching analytics:', err);
-    }
-  };
-
-  const handleAddEvent = async (eventData) => {
-    try {
-      const response = await addCropEvent(id, eventData);
-      setCalendar(prev => ({
-        ...prev,
-        cropEvents: [...prev.cropEvents, response.data]
-      }));
-      setToast({ type: 'success', message: 'Event added successfully' });
-      setShowEventModal(false);
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to add event' });
-    }
-  };
-
-  const handleEditEvent = async (eventId, updateData) => {
-    try {
-      const response = await updateCropEvent(id, eventId, updateData);
-      setCalendar(prev => ({
-        ...prev,
-        cropEvents: prev.cropEvents.map(event => 
-          event._id === eventId ? response.data : event
-        )
-      }));
-      setToast({ type: 'success', message: 'Event updated successfully' });
-      setShowEventModal(false);
-      setEditingEvent(null);
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to update event' });
-    }
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    if (!window.confirm('Are you sure you want to delete this event?')) return;
-    
-    try {
-      await deleteCropEvent(id, eventId);
-      setCalendar(prev => ({
-        ...prev,
-        cropEvents: prev.cropEvents.filter(event => event._id !== eventId)
-      }));
-      setToast({ type: 'success', message: 'Event deleted successfully' });
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to delete event' });
-    }
-  };
-
-  const handleExport = async (format = 'csv') => {
-    try {
-      const blob = await exportCalendar(id, format);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${calendar.cropName}-calendar.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      setToast({ type: 'success', message: 'Calendar exported successfully' });
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to export calendar' });
-    }
-  };
-
-  const handleImport = async (file) => {
-    try {
-      await importCalendar(file);
-      setToast({ type: 'success', message: 'Calendar imported successfully' });
-      fetchCalendar(); // Refresh calendar data
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to import calendar' });
-    }
-  };
-
-  const handleInviteCollaborator = async (email, role) => {
-    try {
-      await inviteCollaborator(id, email, role);
-      setToast({ type: 'success', message: 'Collaborator invited successfully' });
-      setShowCollaboratorModal(false);
-    } catch (err) {
-      setToast({ type: 'error', message: err.message || 'Failed to invite collaborator' });
-    }
-  };
-
-  const handleGetWeatherSuggestions = async (latitude, longitude, activity) => {
-    try {
-      const response = await getWeatherSuggestions(latitude, longitude, activity);
-      return response.data;
-    } catch (err) {
-      console.error('Error getting weather suggestions:', err);
-      return null;
-    }
-  };
-
-  const handleViewAnalytics = async (calendarId) => {
-    setActiveTab('analytics');
-    if (!analytics) {
-      await fetchAnalytics();
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500"></div>
-        <p className="ml-4 text-gray-600">Loading calendar...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Calendar</h2>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={() => navigate('/growth-calendar')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Back to Calendars
-        </button>
-      </div>
-    );
-  }
-
-  if (!calendar) {
-    return (
-      <div className="text-center py-12">
-        <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Calendar Not Found</h2>
-        <p className="text-gray-600 mb-4">The requested calendar could not be found.</p>
-        <button
-          onClick={() => navigate('/growth-calendar')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Back to Calendars
-        </button>
-      </div>
-    );
-  }
+  if (loading) return <p>Loading calendar details...</p>;
+  if (error) return <p className="text-red-500">Error: {error}</p>;
+  if (!calendar) return <p>No calendar data found.</p>;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-4">
+    <div className="container mx-auto p-4 md:p-6 bg-green-50 dark:bg-gray-900 min-h-screen">
+      <Link to="/growth-calendar" className="inline-flex items-center gap-2 text-green-700 dark:text-green-300 hover:underline mb-4">
+        <ArrowLeft size={20} />
+        Back to All Calendars
+      </Link>
+
+      <PageHeader 
+        title={calendar.cropName}
+        subtitle={`Variety: ${calendar.variety || 'N/A'} | Planted on ${new Date(calendar.plantingDate).toLocaleDateString()}`}
+      />
+
+      {/* AI Suggestion Banner */}
+      {aiBanner && (
+        <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-emerald-800 text-sm font-medium">{aiBanner.message}</p>
+            <div className="flex gap-2">
               <button
-                onClick={() => navigate('/growth-calendar')}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+                onClick={async () => {
+                  try {
+                    const tasks = aiBanner.schedule?.schedule || [];
+                    // Bulk apply: sequentially add events
+                    for (const ev of tasks) {
+                      const created = await addCropEvent(calendar._id, {
+                        ...ev,
+                        date: ev.date,
+                        title: ev.title || ev.type,
+                      });
+                      // Update local state
+                      setCalendar(prev => ({ ...prev, cropEvents: [...(prev.cropEvents || []), created] }));
+                    }
+                    // Update estimated harvest if provided
+                    if (aiBanner.schedule?.estimatedHarvestDate) {
+                      setCalendar(prev => ({ ...prev, estimatedHarvestDate: aiBanner.schedule.estimatedHarvestDate }));
+                    }
+                    setAiBanner(null);
+                    toast.success('AI schedule applied');
+                  } catch (err) {
+                    toast.error(err?.message || 'Failed to apply AI schedule');
+                  }
+                }}
               >
-                <ArrowLeft className="w-5 h-5" />
+                Apply
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {calendar.cropName}
-                </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {calendar.variety && `${calendar.variety} • `}
-                  {new Date(calendar.plantingDate).toLocaleDateString()} - {new Date(calendar.estimatedHarvestDate).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowEventModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Event
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowCollaboratorModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Share2 className="w-4 h-4" />
-                Share
-              </motion.button>
+              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm" onClick={() => setAiBanner(null)}>Dismiss</button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Tab Navigation */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'calendar', label: 'Calendar', icon: Calendar },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-              { id: 'events', label: 'Events', icon: Clock },
-              { id: 'collaborators', label: 'Collaborators', icon: Users }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-green-500 text-green-600 dark:text-green-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+      <div className="mt-8">
+        <h2 className="text-2xl font-semibold text-center mb-6 text-gray-700 dark:text-gray-300">Growth Timeline</h2>
+        <div ref={timelineRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {calendar.stages.map((stage, index) => (
+            <StageCard key={stage._id || index} stage={stage} isActive={index === activeIndex} />
+          ))}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <AnimatePresence mode="wait">
-          {activeTab === 'calendar' && (
-            <motion.div
-              key="calendar"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="h-[calc(100vh-200px)]"
-            >
-              <CalendarView
-                calendar={calendar}
-                onAddEvent={handleAddEvent}
-                onEditEvent={(event) => {
-                  setEditingEvent(event);
-                  setShowEventModal(true);
-                }}
-                onDeleteEvent={handleDeleteEvent}
-                onExport={handleExport}
-                onImport={handleImport}
-                onInviteCollaborator={handleInviteCollaborator}
-                onViewAnalytics={handleViewAnalytics}
-                onGetWeatherSuggestions={handleGetWeatherSuggestions}
-              />
-              <div className="mt-6">
-                <RotationRecommendations
-                  calendar={calendar}
-                  onSave={async (data) => {
-                    try {
-                      const res = await updateGrowthCalendar(calendar._id, data);
-                      setCalendar(res.data);
-                      setToast({ type: 'success', message: 'Rotation notes saved' });
-                    } catch (e) {
-                      setToast({ type: 'error', message: e?.message || 'Failed to save rotation notes' });
-                    }
-                  }}
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'analytics' && (
-            <motion.div
-              key="analytics"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <CalendarAnalytics
-                calendarId={id}
-                analytics={analytics}
-                onRefresh={fetchAnalytics}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'events' && (
-            <motion.div
-              key="events"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <EventsList
-                events={calendar.cropEvents || []}
-                onEdit={handleEditEvent}
-                onDelete={handleDeleteEvent}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'collaborators' && (
-            <motion.div
-              key="collaborators"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <CollaboratorsList
-                collaborators={calendar.collaborators || []}
-                onInvite={handleInviteCollaborator}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Interactive Calendar */}
+      <div className="mt-12">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Calendar</h3>
+        <CalendarView
+          calendar={calendar}
+          onAddEvent={async (event) => {
+            try {
+              const created = await addCropEvent(calendar._id, event);
+              setCalendar(prev => ({ ...prev, cropEvents: [...(prev.cropEvents || []), created] }));
+              toast.success('Event added');
+            } catch (err) {
+              toast.error(err?.message || 'Failed to add event');
+            }
+          }}
+          onEditEvent={async (event) => {
+            try {
+              const updated = await updateCropEvent(calendar._id, event._id, event);
+              setCalendar(prev => ({
+                ...prev,
+                cropEvents: (prev.cropEvents || []).map(e => (e._id === updated._id ? updated : e))
+              }));
+              toast.success('Event updated');
+            } catch (err) {
+              toast.error(err?.message || 'Failed to update event');
+            }
+          }}
+          onDeleteEvent={async (eventId) => {
+            try {
+              await deleteCropEvent(calendar._id, eventId);
+              setCalendar(prev => ({
+                ...prev,
+                cropEvents: (prev.cropEvents || []).filter(e => e._id !== eventId)
+              }));
+              toast.success('Event deleted');
+            } catch (err) {
+              toast.error(err?.message || 'Failed to delete event');
+            }
+          }}
+          onExport={() => toast('Export coming soon')}
+          onImport={() => toast('Import coming soon')}
+          onInviteCollaborator={() => toast('Invite coming soon')}
+          onViewAnalytics={async () => {
+            try {
+              const a = await getCalendarAnalytics(calendar._id);
+              setAnalytics(a);
+            } catch (err) {
+              toast.error(err?.message || 'Failed to load analytics');
+            }
+          }}
+          onGetWeatherSuggestions={async (lat, lon, type) => {
+            try {
+              const res = await getWeatherSuggestions(lat, lon, type);
+              return res;
+            } catch (err) {
+              toast.error(err?.message || 'Failed to get weather');
+              return null;
+            }
+          }}
+        />
       </div>
 
-      {/* Toast */}
-      <Toast
-        message={toast?.message}
-        type={toast?.type}
-        onDismiss={() => setToast(null)}
-      />
+      {/* Analytics */}
+      <div className="mt-12">
+        <CalendarAnalytics
+          calendarId={calendar._id}
+          analytics={analytics}
+          onRefresh={async () => {
+            const a = await getCalendarAnalytics(calendar._id);
+            setAnalytics(a);
+          }}
+        />
+      </div>
+
+      {/* Placeholder for adding/editing tasks, harvest records etc. */}
+      <div className="mt-12 text-center">
+        <div className="inline-flex gap-3">
+          <button
+            onClick={async () => {
+              // Quick prompt-based task creation for now
+              const title = window.prompt('Task title');
+              if (!title) return;
+              const description = window.prompt('Task description (optional)') || '';
+              const payload = { calendarId: calendar._id, title, description };
+              try {
+                const newTask = await createTask(payload);
+                // Update local calendar state: append to top-level customReminders or stages
+                // We don't know where backend stores tasks; append to calendar.customReminders for UI
+                setCalendar(prev => ({ ...prev, customReminders: [...(prev.customReminders||[]), newTask] }));
+                toast.success('Task created');
+              } catch (err) {
+                console.error(err);
+                toast.error(err?.message || 'Failed to create task');
+              }
+            }}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Add Task
+          </button>
+
+          <button
+            onClick={async () => {
+              const title = window.prompt('Reminder title');
+              if (!title) return;
+              const date = window.prompt('Reminder date (YYYY-MM-DD)');
+              if (!date) return;
+              const payload = { calendarId: calendar._id, title, date };
+              try {
+                const newReminder = await createReminder(payload);
+                setCalendar(prev => ({ ...prev, customReminders: [...(prev.customReminders||[]), newReminder] }));
+                toast.success('Reminder created');
+              } catch (err) {
+                console.error(err);
+                toast.error(err?.message || 'Failed to create reminder');
+              }
+            }}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Add Reminder
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

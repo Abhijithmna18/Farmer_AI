@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Palette, Shield, Bell, Trash2, AlertTriangle } from 'lucide-react';
+import { User, Palette, Shield, Bell, Trash2, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import Toast from '../components/Toast';
 import AccountSection from '../components/settings/AccountSection';
@@ -65,8 +66,19 @@ export default function Settings() {
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 text-white">
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <p className="text-green-100 mt-2">Manage your account and preferences</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">Settings</h1>
+                <p className="text-green-100 mt-2">Manage your account and preferences</p>
+              </div>
+              <Link
+                to="/advanced-settings"
+                className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all backdrop-blur-sm"
+              >
+                <SettingsIcon className="w-5 h-5" />
+                <span className="font-medium">Advanced Settings</span>
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-col lg:flex-row">

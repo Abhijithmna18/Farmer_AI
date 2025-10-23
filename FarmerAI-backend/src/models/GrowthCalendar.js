@@ -30,7 +30,7 @@ const cropEventSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false,
   },
   // For recurring events
   isRecurring: { type: Boolean, default: false },
@@ -120,6 +120,11 @@ const growthStageSchema = new mongoose.Schema({
   tasks: [taskSchema],
   expectedDuration: { type: Number }, // in days
   actualDuration: { type: Number }, // in days
+  status: { 
+    type: String, 
+    enum: ['upcoming', 'active', 'completed'], 
+    default: 'upcoming' 
+  },
 });
 
 const harvestRecordSchema = new mongoose.Schema({
@@ -138,7 +143,7 @@ const growthCalendarSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
     },
     cropName: {
       type: String,
@@ -152,6 +157,21 @@ const growthCalendarSchema = new mongoose.Schema(
     plantingDate: {
       type: Date,
       required: true,
+    },
+    // Malayalam (Kollavarsham) equivalents for top-level dates
+    malayalamDates: {
+      planting: {
+        year: { type: Number },
+        monthIndex: { type: Number, min: 0, max: 11 },
+        month: { type: String },
+        day: { type: Number, min: 1, max: 31 },
+      },
+      estimatedHarvest: {
+        year: { type: Number },
+        monthIndex: { type: Number, min: 0, max: 11 },
+        month: { type: String },
+        day: { type: Number, min: 1, max: 31 },
+      }
     },
     estimatedHarvestDate: {
       type: Date,
@@ -212,6 +232,7 @@ const growthCalendarSchema = new mongoose.Schema(
     season: { type: String }, // e.g., "2024-spring", "2024-fall"
     year: { type: Number },
     isActive: { type: Boolean, default: true },
+    calendarSystem: { type: String, enum: ['gregorian', 'malayalam'], default: 'gregorian' },
   },
   {
     timestamps: true,

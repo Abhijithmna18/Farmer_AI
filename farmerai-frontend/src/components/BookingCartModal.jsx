@@ -22,14 +22,14 @@ const BookingCartModal = () => {
     
     setIsProcessing(true);
     try {
-      // For now, redirect to the first warehouse's booking form
-      // In a full implementation, you'd create a multi-warehouse checkout
+      // Redirect to booking form for the first item
+      // Future: implement multi-warehouse checkout
       const firstItem = cartItems[0];
       setIsCartOpen(false);
-      navigate(`/dashboard/warehouses/${firstItem.warehouse._id}`, {
-        state: { 
+      navigate(`/warehouses/${firstItem.warehouse._id}/book`, {
+        state: {
           bookingData: firstItem.bookingData,
-          fromCart: true 
+          fromCart: true
         }
       });
     } catch (error) {
