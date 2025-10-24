@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { workshopService } from '../services/workshopService';
 import Button from '../components/Button';
@@ -7,7 +7,8 @@ import { AuthContext } from '../context/AuthContext';
 const Subscription = () => {
   const { plan } = useParams();
   const nav = useNavigate();
-  const { user, refreshToken } = useContext(AuthContext);
+  const { user, refreshToken, refreshSubscriptionStatus } = useContext(AuthContext);
+  const [paymentStatus, setPaymentStatus] = useState(null); // null, 'processing', 'success', 'failed'
 
   const plans = {
     monthly: {
@@ -44,9 +45,13 @@ const Subscription = () => {
 
   const handleSubscribe = async () => {
     try {
+      // Set payment status to processing
+      setPaymentStatus('processing');
+      
       // Check if user is authenticated
       console.log('User authentication status:', user);
       if (!user) {
+        setPaymentStatus(null);
         alert('You must be logged in to subscribe. Please log in and try again.');
         return;
       }
@@ -59,17 +64,26 @@ const Subscription = () => {
       console.log('Subscription order response:', response);
       
       // Check if response has the expected structure
-      if (!response || !response.data || !response.data.data) {
+      if (!response || !response.data) {
         console.error('Invalid response structure:', response);
         alert('Failed to create subscription order. Invalid response from server.');
         return;
       }
       
-      const { orderId, amount, currency, subscriptionId } = response.data.data;
+      // Handle both response formats: { data: { ... } } and { success: true, data: { ... } }
+      const responseData = response.data.data || response.data;
+      
+      if (!responseData) {
+        console.error('Invalid response data structure:', response);
+        alert('Failed to create subscription order. Invalid response data from server.');
+        return;
+      }
+      
+      const { orderId, amount, currency, subscriptionId } = responseData;
       
       // Check if all required properties are present
       if (!orderId || !amount || !currency || !subscriptionId) {
-        console.error('Missing required properties in response data:', response.data.data);
+        console.error('Missing required properties in response data:', responseData);
         alert('Failed to create subscription order. Missing required data from server.');
         return;
       }
@@ -84,20 +98,48 @@ const Subscription = () => {
         order_id: orderId,
         handler: async function (response) {
           try {
+            console.log('Razorpay payment response:', response);
+            
             // Verify payment
-            await workshopService.verifySubscriptionPayment({
+            const verifyResponse = await workshopService.verifySubscriptionPayment({
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
               signature: response.razorpay_signature,
               subscriptionId: subscriptionId
             });
             
-            // Show success message and redirect
+            console.log('Payment verification response:', verifyResponse);
+            
+            // Refresh user's subscription status
+            try {
+              await refreshSubscriptionStatus();
+            } catch (err) {
+              console.error('Failed to refresh subscription status:', err);
+            }
+            
+            // Set payment status to success
+            setPaymentStatus('success');
+            
+            // Show success message
             alert('Subscription successful! You now have access to all premium content.');
-            nav('/workshops');
+            
+            // Redirect to workshops page after a short delay to show success message
+            setTimeout(() => {
+              nav('/workshops');
+            }, 2000);
           } catch (err) {
             console.error('Error verifying payment:', err);
-            alert('Payment verification failed. Please contact support.');
+            setPaymentStatus(null); // Reset payment status on error
+            
+            // Show detailed error message
+            let errorMessage = 'Payment verification failed. Please contact support.';
+            if (err.response && err.response.data && err.response.data.message) {
+              errorMessage = `Payment verification failed: ${err.response.data.message}`;
+            } else if (err.message) {
+              errorMessage = `Payment verification failed: ${err.message}`;
+            }
+            
+            alert(errorMessage);
           }
         },
         prefill: {
@@ -120,6 +162,8 @@ const Subscription = () => {
       rzp.open();
     } catch (err) {
       console.error('Error creating subscription order:', err);
+      setPaymentStatus(null); // Reset payment status on error
+      
       if (err.response) {
         console.error('Response data:', err.response.data);
         console.error('Response status:', err.response.status);
@@ -160,80 +204,128 @@ const Subscription = () => {
           </svg>
           Back
         </button>
-
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Get unlimited access to our premium farming workshops and expert-led tutorials.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">{selectedPlan.name}</h2>
-              <div className="mt-4">
-                <span className="text-5xl font-bold text-gray-900">₹{selectedPlan.price}</span>
-                <span className="text-gray-600">/{selectedPlan.period}</span>
+        
+        {/* Payment Success Message */}
+        {paymentStatus === 'success' && (
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
-              <p className="mt-2 text-gray-600">{selectedPlan.description}</p>
             </div>
-
-            <ul className="space-y-4 mb-8">
-              {selectedPlan.features.map((feature, index) => (
-                <li key={index} className="flex items-center">
-                  <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-gray-700">{feature}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="text-center">
-              <Button
-                onClick={handleSubscribe}
-                variant="accent"
-                className="w-full md:w-auto px-8 py-4 text-lg"
-              >
-                Subscribe Now
-              </Button>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Subscription Confirmed!</h2>
+            <p className="text-gray-600 mb-6">Thank you for your subscription. You now have access to all premium content.</p>
+            <p className="text-gray-500 text-sm mb-6">Redirecting to workshops...</p>
+            <Button
+              onClick={() => nav('/workshops')}
+              variant="accent"
+              className="px-6 py-2"
+            >
+              Go to Workshops Now
+            </Button>
+          </div>
+        )}
+        
+        {/* Payment Processing Message */}
+        {paymentStatus === 'processing' && (
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600"></div>
             </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing Payment</h2>
+            <p className="text-gray-600 mb-6">Please wait while we process your payment...</p>
+            <Button
+              onClick={() => setPaymentStatus(null)}
+              variant="secondary"
+              className="px-6 py-2"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
 
-            <div className="mt-8 text-center">
-              <p className="text-gray-600 text-sm">
-                By subscribing, you agree to our Terms of Service and Privacy Policy.
-                Your subscription will automatically renew unless canceled.
+        {paymentStatus !== 'success' && paymentStatus !== 'processing' && (
+          <>
+            <div className="text-center mb-12">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Get unlimited access to our premium farming workshops and expert-led tutorials.
               </p>
             </div>
-          </div>
-        </div>
 
-        {/* Plan comparison */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
-          {Object.entries(plans).map(([key, plan]) => (
-            <div
-              key={key}
-              className={`bg-white rounded-xl shadow-md p-6 border-2 ${
-                key === selectedPlan ? 'border-green-500' : 'border-gray-200'
-              }`}
-            >
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-              <div className="mb-4">
-                <span className="text-3xl font-bold text-gray-900">₹{plan.price}</span>
-                <span className="text-gray-600">/{plan.period}</span>
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900">{selectedPlan.name}</h2>
+                  <div className="mt-4">
+                    <span className="text-5xl font-bold text-gray-900">₹{selectedPlan.price}</span>
+                    <span className="text-gray-600">/{selectedPlan.period}</span>
+                  </div>
+                  <p className="mt-2 text-gray-600">{selectedPlan.description}</p>
+                </div>
+
+                <ul className="space-y-4 mb-8">
+                  {selectedPlan.features.map((feature, index) => (
+                    <li key={index} className="flex items-center">
+                      <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-gray-700">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="text-center">
+                  <Button
+                    onClick={handleSubscribe}
+                    variant="accent"
+                    className="w-full md:w-auto px-8 py-4 text-lg"
+                    disabled={paymentStatus === 'processing'}
+                  >
+                    {paymentStatus === 'processing' ? 'Processing...' : 'Subscribe Now'}
+                  </Button>
+                </div>
+
+                <div className="mt-8 text-center">
+                  <p className="text-gray-600 text-sm">
+                    By subscribing, you agree to our Terms of Service and Privacy Policy.
+                    Your subscription will automatically renew unless canceled.
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-600 mb-4">{plan.description}</p>
-              <Button
-                onClick={() => nav(`/subscription/${key}`)}
-                variant={key === selectedPlan ? 'accent' : 'primary'}
-                className="w-full"
-              >
-                {key === selectedPlan ? 'Current Plan' : 'Select Plan'}
-              </Button>
             </div>
-          ))}
-        </div>
+          </>
+        )}
+
+        {paymentStatus !== 'success' && paymentStatus !== 'processing' && (
+          /* Plan comparison */
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
+            {Object.entries(plans).map(([key, plan]) => (
+              <div
+                key={key}
+                className={`bg-white rounded-xl shadow-md p-6 border-2 ${
+                  key === selectedPlan ? 'border-green-500' : 'border-gray-200'
+                }`}
+              >
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-bold text-gray-900">₹{plan.price}</span>
+                  <span className="text-gray-600">/{plan.period}</span>
+                </div>
+                <p className="text-gray-600 mb-4">{plan.description}</p>
+                <Button
+                  onClick={() => nav(`/subscription/${key}`)}
+                  variant={key === selectedPlan ? 'accent' : 'primary'}
+                  className="w-full"
+                >
+                  {key === selectedPlan ? 'Current Plan' : 'Select Plan'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

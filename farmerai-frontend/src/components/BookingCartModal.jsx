@@ -77,9 +77,9 @@ const BookingCartModal = () => {
                 <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">{item.warehouse.name}</h3>
+                      <h3 className="font-semibold text-gray-900 mb-1">{item.warehouse.name || 'Unknown Warehouse'}</h3>
                       <p className="text-sm text-gray-600 mb-2">
-                        {item.warehouse.location?.city}, {item.warehouse.location?.state}
+                        {item.warehouse.location?.city || 'Unknown City'}, {item.warehouse.location?.state || 'Unknown State'}
                       </p>
                       <div className="flex flex-wrap gap-1 mb-2">
                         {item.warehouse.storageTypes?.slice(0, 2).map((type, index) => (

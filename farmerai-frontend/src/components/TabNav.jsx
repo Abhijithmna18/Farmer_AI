@@ -97,72 +97,75 @@ export default function TabNav({ isOpen, onToggle }) {
 					</div>
 				</div>
 
-				{/* Show admin menu if user is on admin route and is admin */}
-				{isAdmin && location.pathname.startsWith('/admin') ? (
-					<>
-						<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mb-2">Admin</div>
-						<nav className="space-y-1" aria-label="Admin">
-							{adminMenu.map(({ to, label, Icon }) => (
-								<NavLink
-									key={to}
-									to={to}
-									className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
-									onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
-								>
-									<span className="grid place-items-center w-8 h-8 rounded-lg bg-green-100 text-green-700 group-hover:bg-green-200">
+				{/* Scrollable container for sidebar content */}
+				<div className="overflow-y-auto max-h-[calc(100vh-120px)] pr-2 scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent scrollbar-thumb-rounded-full hover:scrollbar-thumb-green-300">
+					{/* Show admin menu if user is on admin route and is admin */}
+					{isAdmin && location.pathname.startsWith('/admin') ? (
+						<>
+							<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mb-2">Admin</div>
+							<nav className="space-y-1" aria-label="Admin">
+								{adminMenu.map(({ to, label, Icon }) => (
+									<NavLink
+										key={to}
+										to={to}
+										className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
+										onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
+									>
+										<span className="grid place-items-center w-8 h-8 rounded-lg bg-green-100 text-green-700 group-hover:bg-green-200">
+											<Icon className="w-4 h-4" aria-hidden />
+										</span>
+										<span className="font-medium flex-1">{label}</span>
+									</NavLink>
+								))}
+							</nav>
+							{/* Logout button removed as per requirements */}
+						</>
+					) : (
+						<>
+							{/* Sections */}
+							<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mb-2">Main</div>
+							<nav className="space-y-1" aria-label="Primary">
+								{menu.slice(0,6).map(({ to, label, Icon }) => (
+									<NavLink
+										key={to}
+										to={to}
+										className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
+										onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
+									>
+										<span className="grid place-items-center w-8 h-8 rounded-lg bg-green-100 text-green-700 group-hover:bg-green-200">
+											<Icon className="w-4 h-4" aria-hidden />
+										</span>
+										<span className="font-medium flex-1">{label}</span>
+									</NavLink>
+								))}
+							</nav>
+
+							<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mt-4 mb-2">More</div>
+							<nav className="space-y-1" aria-label="Secondary">
+								{menu.slice(6).map(({ to, label, Icon }) => (
+									<NavLink
+										key={to}
+										to={to}
+										className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
+										onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
+									>
+										<span className="grid place-items-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 group-hover:bg-gray-200">
 										<Icon className="w-4 h-4" aria-hidden />
 									</span>
-									<span className="font-medium flex-1">{label}</span>
-								</NavLink>
-							))}
-						</nav>
-						{/* Logout button removed as per requirements */}
-					</>
-				) : (
-					<>
-						{/* Sections */}
-						<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mb-2">Main</div>
-						<nav className="space-y-1" aria-label="Primary">
-							{menu.slice(0,6).map(({ to, label, Icon }) => (
-								<NavLink
-									key={to}
-									to={to}
-									className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
-									onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
-								>
-									<span className="grid place-items-center w-8 h-8 rounded-lg bg-green-100 text-green-700 group-hover:bg-green-200">
-										<Icon className="w-4 h-4" aria-hidden />
-									</span>
-									<span className="font-medium flex-1">{label}</span>
-								</NavLink>
-							))}
-						</nav>
+										<span className="font-medium flex-1">{label}</span>
+										{label === 'Feedback' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">New</span>}
+									</NavLink>
+								))}
+							</nav>
+							{/* Logout button removed as per requirements */}
+						</>
+					)}
 
-						<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mt-4 mb-2">More</div>
-						<nav className="space-y-1" aria-label="Secondary">
-							{menu.slice(6).map(({ to, label, Icon }) => (
-								<NavLink
-									key={to}
-									to={to}
-									className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-green-50/80 ${isActive ? 'bg-green-600 text-white shadow-green-300' : ''}`}
-									onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
-								>
-									<span className="grid place-items-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 group-hover:bg-gray-200">
-									<Icon className="w-4 h-4" aria-hidden />
-								</span>
-									<span className="font-medium flex-1">{label}</span>
-									{label === 'Feedback' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">New</span>}
-								</NavLink>
-							))}
-						</nav>
-						{/* Logout button removed as per requirements */}
-					</>
-				)}
-
-				<div className="mt-auto pt-6 text-xs text-gray-500">
-					<div className="flex items-center justify-between px-1">
-						<div aria-hidden>FarmerAI</div>
-						<div className="text-[10px] text-gray-400">v1.0</div>
+					<div className="mt-auto pt-6 text-xs text-gray-500">
+						<div className="flex items-center justify-between px-1">
+							<div aria-hidden>FarmerAI</div>
+							<div className="text-[10px] text-gray-400">v1.0</div>
+						</div>
 					</div>
 				</div>
 			</aside>

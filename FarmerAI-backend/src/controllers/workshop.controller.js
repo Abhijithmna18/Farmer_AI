@@ -84,8 +84,24 @@ const getWorkshopById = async (req, res) => {
 // Create Razorpay order for workshop subscription
 const createWorkshopSubscriptionOrder = async (req, res) => {
   try {
+    // Validate request body exists
+    if (!req.body) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required'
+      });
+    }
+    
     const { type = 'monthly', workshopId } = req.body;
     const userId = req.user.id;
+    
+    // Validate request body
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subscription type is required'
+      });
+    }
     
     let amount, description;
     
@@ -128,7 +144,7 @@ const createWorkshopSubscriptionOrder = async (req, res) => {
       default:
         return res.status(400).json({
           success: false,
-          message: 'Invalid subscription type'
+          message: 'Invalid subscription type. Valid types are: monthly, yearly, workshop'
         });
     }
     
@@ -168,10 +184,33 @@ const createWorkshopSubscriptionOrder = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error creating workshop subscription order:', error);
+    
+    // Provide more detailed error information
+    if (error.message.includes('Razorpay credentials')) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment system is currently unavailable. Please try again later.',
+        error: 'Payment gateway configuration error'
+      });
+    }
+    
+    // Check if it's a network error or Razorpay API error
+    if (error.response && error.response.data) {
+      // This is likely a Razorpay API error
+      return res.status(error.response.status || 500).json({
+        success: false,
+        message: 'Payment gateway error',
+        error: error.response.data.error || error.response.data.message || 'Unknown Razorpay error',
+        details: error.response.data
+      });
+    }
+    
+    // Generic error response
     res.status(500).json({
       success: false,
       message: 'Failed to create subscription order',
-      error: error.message
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -204,6 +243,32 @@ const verifyWorkshopSubscriptionPayment = async (req, res) => {
     
     subscription.status = 'active';
     await subscription.save();
+    
+    // Get user details for email
+    const User = require('../models/User');
+    const user = await User.findById(userId);
+    
+    // Import email service
+    const { sendPaymentConfirmation } = require('../services/email.service');
+    
+    // Send payment confirmation email
+    try {
+      await sendPaymentConfirmation(user.email, {
+        farmerName: `${user.firstName} ${user.lastName}`,
+        bookingId: subscription.subscriptionId,
+        paymentId: paymentId,
+        amount: subscription.amount.total,
+        paymentMethod: 'Razorpay',
+        paymentDate: new Date().toLocaleDateString(),
+        warehouseName: 'Workshop Subscription',
+        startDate: subscription.startDate.toLocaleDateString(),
+        endDate: subscription.endDate.toLocaleDateString()
+      });
+      logger.info(`Payment confirmation email sent to ${user.email}`);
+    } catch (emailError) {
+      logger.error('Failed to send payment confirmation email:', emailError);
+      // Don't fail the response if email fails
+    }
     
     res.json({
       success: true,
@@ -269,10 +334,10 @@ const calculateEndDate = (type) => {
 // Check if user has access to a workshop
 const checkWorkshopAccess = async (req, res) => {
   try {
-    const { workshopId } = req.params;
+    const { id } = req.params;
     const userId = req.user.id;
     
-    const workshop = await Workshop.findById(workshopId);
+    const workshop = await Workshop.findById(id);
     
     if (!workshop) {
       return res.status(404).json({
@@ -299,7 +364,7 @@ const checkWorkshopAccess = async (req, res) => {
       endDate: { $gte: new Date() },
       $or: [
         { type: { $in: ['monthly', 'yearly'] } }, // Any active subscription
-        { workshops: workshopId } // Specific workshop purchase
+        { workshops: id } // Specific workshop purchase
       ]
     });
     

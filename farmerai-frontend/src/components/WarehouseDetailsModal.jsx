@@ -173,9 +173,9 @@ const WarehouseDetailsModal = ({ isOpen, onClose, warehouse, onBook }) => {
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">
-                          {warehouse.owner.firstName} {warehouse.owner.lastName}
-                        </p>
+                        <div className="font-medium text-gray-900">
+                          {warehouse.owner.firstName || 'Unknown'} {warehouse.owner.lastName || ''}
+                        </div>
                         {warehouse.owner.warehouseOwnerProfile?.businessName && (
                           <p className="text-sm text-gray-600">
                             {warehouse.owner.warehouseOwnerProfile.businessName}

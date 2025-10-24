@@ -375,6 +375,17 @@ exports.getProfile = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Check for active subscriptions
+    const WorkshopSubscription = require('../models/WorkshopSubscription');
+    const activeSubscriptions = await WorkshopSubscription.find({
+      user: user._id,
+      status: 'active',
+      endDate: { $gte: new Date() }
+    }).sort({ endDate: -1 });
+
+    const hasActiveSubscription = activeSubscriptions.length > 0;
+    const subscriptionEndDate = hasActiveSubscription ? activeSubscriptions[0].endDate : null;
+
     // Migration logic: if user has name but no firstName/lastName, split it
     if (user.name && (!user.firstName || !user.lastName)) {
       const nameParts = user.name.trim().split(' ');
@@ -415,7 +426,9 @@ exports.getProfile = async (req, res, next) => {
         firstName: user.firstName,
         lastName: user.lastName,
         name: user.name || `${user.firstName} ${user.lastName}`.trim(),
-        photoURL: profilePictureUrl
+        photoURL: profilePictureUrl,
+        hasActiveSubscription: hasActiveSubscription,
+        subscriptionEndDate: subscriptionEndDate
       } 
     });
   } catch (err) {

@@ -41,12 +41,15 @@ export const workshopService = {
       console.log('Sending subscription order request:', subscriptionData);
       const response = await apiClient.post('/workshops/subscription/order', subscriptionData);
       console.log('Received subscription order response:', response);
-      // Check if response has data property
+      
+      // Handle different response structures
       if (!response || !response.data) {
         console.error('Invalid response structure:', response);
         throw new Error('Invalid response from server');
       }
-      return response.data;
+      
+      // Return the full response to maintain consistency with axios response structure
+      return response;
     } catch (error) {
       console.error('Error creating subscription order:', error);
       if (error.response) {
@@ -71,10 +74,16 @@ export const workshopService = {
   // Verify subscription payment
   verifySubscriptionPayment: async (paymentData) => {
     try {
-      const { data } = await apiClient.post('/workshops/subscription/verify', paymentData);
-      return data;
+      console.log('Sending payment verification request:', paymentData);
+      const response = await apiClient.post('/workshops/subscription/verify', paymentData);
+      console.log('Payment verification response:', response);
+      return response.data;
     } catch (error) {
       console.error('Error verifying subscription payment:', error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+      }
       throw error;
     }
   },

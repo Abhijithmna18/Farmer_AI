@@ -340,6 +340,7 @@ const DiscussionForum = ({ searchQuery }) => {
         post={selectedPost}
         isOpen={showPostModal}
         onClose={handleCloseModal}
+        user={user}
       />
     </div>
   );

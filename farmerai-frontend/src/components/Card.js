@@ -7,7 +7,7 @@ export default function Card({ children, className = "", as: Tag = "div", ...pro
       className={`${glass.card} p-4 sm:p-6 ${
         // ensure adequate contrast and interaction
         "text-gray-900 dark:text-gray-100"
-      } ${className} transition-colors duration-200`}
+      } ${className} transition-all duration-300 hover:shadow-xl`}
       {...props}
     >
       {children}

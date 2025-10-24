@@ -6,7 +6,7 @@ import { fetchAdminAnalytics, fetchAdminOverview, fetchAdminReports, fetchWareho
 import apiClient from '../../services/apiClient';
 
 const StatCard = ({ title, value, icon }) => (
-  <div className="rounded-2xl bg-white/70 backdrop-blur border border-slate-200 p-5 shadow-sm">
+  <div className="rounded-2xl bg-white/70 backdrop-blur border border-slate-200 p-6 shadow-sm">
     <div className="flex items-center justify-between">
       <div>
         <div className="text-slate-500 text-sm">{title}</div>

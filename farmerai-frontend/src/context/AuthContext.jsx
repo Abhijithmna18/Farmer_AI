@@ -25,6 +25,21 @@ export function AuthProvider({ children }) {
       localStorage.clear();
       sessionStorage.clear();
       
+      // Clear any cached data in apiClient (if using cache)
+      // This ensures that when a new user logs in, they don't see cached data
+      if (apiClient.defaults.headers) {
+        delete apiClient.defaults.headers['Authorization'];
+      }
+      
+      // Force clear any potential cache in the browser
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => {
+            caches.delete(name);
+          });
+        });
+      }
+      
       // Sign out from Firebase
       await auth.signOut();
       
@@ -156,6 +171,22 @@ export function AuthProvider({ children }) {
     initFromJwt();
   }, [user, themeCtx?.setThemeMode, setUser]); // Add user and themeCtx.setThemeMode to dependencies
 
+  // Refresh user subscription status
+  const refreshSubscriptionStatus = async () => {
+    if (!user) return;
+    
+    try {
+      // Refresh the user profile which should include subscription info
+      const res = await apiClient.get("/auth/me");
+      const backendUser = res.data.user || user;
+      setUser(backendUser);
+      return backendUser;
+    } catch (err) {
+      console.error("Failed to refresh subscription status:", err);
+      throw err;
+    }
+  };
+
   // Expose refreshToken function
   const authContextValue = {
     user, 
@@ -164,7 +195,8 @@ export function AuthProvider({ children }) {
     error, 
     setError, 
     logout,
-    refreshToken
+    refreshToken,
+    refreshSubscriptionStatus
   };
 
   return (

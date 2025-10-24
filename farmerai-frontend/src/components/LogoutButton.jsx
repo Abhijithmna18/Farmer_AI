@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import Toast from './Toast';
+import apiClient from '../services/apiClient';
 
 export default function LogoutButton({ className = "", showText = true, variant = "button" }) {
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,20 @@ export default function LogoutButton({ className = "", showText = true, variant 
     
     setLoading(true);
     try {
+      // Clear any cached data in the apiClient
+      if (apiClient.clearCache) {
+        apiClient.clearCache();
+      }
+      
+      // Clear browser cache
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => {
+            caches.delete(name);
+          });
+        });
+      }
+      
       const result = await logout();
       
       if (result.success) {

@@ -305,11 +305,11 @@ const WarehouseCard = ({
           <div className="mb-4 p-3 rounded-lg border border-white/40 bg-white/40 backdrop-blur-sm">
             <div className="text-sm text-gray-600 mb-1">Owner:</div>
             <div className="font-medium text-gray-900">
-              {warehouse.owner.firstName} {warehouse.owner.lastName}
+              {warehouse.owner.firstName || 'Unknown'} {warehouse.owner.lastName || ''}
             </div>
             {warehouse.owner.warehouseOwnerProfile && (
               <div className="text-sm text-gray-600">
-                {warehouse.owner.warehouseOwnerProfile.businessName}
+                {warehouse.owner.warehouseOwnerProfile.businessName || 'No business name'}
               </div>
             )}
           </div>

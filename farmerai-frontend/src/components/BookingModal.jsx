@@ -321,15 +321,15 @@ const BookingModal = ({ isOpen, onClose, warehouse, onBook }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Warehouse Info */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">{warehouse.name}</h3>
-            <p className="text-sm text-gray-600 mb-2">{warehouse.description}</p>
+            <h3 className="font-semibold text-gray-900 mb-2">{warehouse.name || 'Unknown Warehouse'}</h3>
+            <p className="text-sm text-gray-600 mb-2">{warehouse.description || 'No description available'}</p>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Location:</span>
-              <span>{warehouse.location.city}, {warehouse.location.state}</span>
+              <span>{warehouse.location?.city || 'Unknown City'}, {warehouse.location?.state || 'Unknown State'}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Price:</span>
-              <span className="font-medium text-green-600">₹{warehouse.pricing.basePrice}/day</span>
+              <span className="font-medium text-green-600">₹{warehouse.pricing?.basePrice || 0}/day</span>
             </div>
           </div>
 

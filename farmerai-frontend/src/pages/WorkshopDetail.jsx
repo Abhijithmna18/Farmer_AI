@@ -34,7 +34,8 @@ const WorkshopDetail = () => {
     try {
       setAccessLoading(true);
       const response = await workshopService.checkWorkshopAccess(id);
-      setHasAccess(response.data.data.hasAccess);
+      // Fix: Access the correct response structure
+      setHasAccess(response.data.hasAccess);
     } catch (err) {
       console.error('Error checking access:', err);
       // If workshop not found, redirect to workshops page
@@ -58,6 +59,9 @@ const WorkshopDetail = () => {
         
         const { orderId, amount, currency } = response.data.data;
         
+        // Store subscriptionId for later use
+        localStorage.setItem('currentWorkshopSubscriptionId', response.data.data.subscriptionId);
+        
         // Initialize Razorpay payment
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY_ID,
@@ -68,13 +72,24 @@ const WorkshopDetail = () => {
           order_id: orderId,
           handler: async function (response) {
             try {
+              console.log('Razorpay payment response:', response);
+              
+              // Extract subscriptionId from the order creation response
+              // This should have been stored when creating the order
+              const subscriptionId = localStorage.getItem('currentWorkshopSubscriptionId');
+              
               // Verify payment
-              await workshopService.verifySubscriptionPayment({
+              const verifyResponse = await workshopService.verifySubscriptionPayment({
                 orderId: response.razorpay_order_id,
                 paymentId: response.razorpay_payment_id,
                 signature: response.razorpay_signature,
-                subscriptionId: response.data.data.subscriptionId
+                subscriptionId: subscriptionId
               });
+              
+              console.log('Payment verification response:', verifyResponse);
+              
+              // Clean up localStorage
+              localStorage.removeItem('currentWorkshopSubscriptionId');
               
               // Refresh access status
               await checkAccess();
@@ -162,9 +177,13 @@ const WorkshopDetail = () => {
           {/* Workshop header */}
           <div className="relative">
             <img
-              src={workshop.thumbnail}
+              src={workshop.thumbnail || `/${workshop.title}.png`}
               alt={workshop.title}
               className="w-full h-96 object-cover"
+              onError={(e) => {
+                // Fallback to lowercase with spaces replaced by underscores
+                e.target.src = `/${workshop.title.toLowerCase().replace(/\s+/g, '_')}.png`;
+              }}
             />
             {!workshop.isFree && (
               <div className="absolute top-6 right-6 bg-yellow-500 text-white text-sm font-bold px-3 py-1 rounded">
@@ -246,7 +265,7 @@ const WorkshopDetail = () => {
                   {workshop.materials.map((material, index) => (
                     <li key={index} className="flex items-start">
                       <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002-2h2a2 2 0 002 2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                       <div>
                         <span className="text-gray-700 font-medium">{material.name}</span>
@@ -274,18 +293,33 @@ const WorkshopDetail = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               ) : hasAccess ? (
                 <Button
-                  onClick={() => nav(`/workshops/${id}/watch`)}
+                  onClick={() => {
+                    if (workshop.isFree && workshop.videoUrl) {
+                      // Redirect to YouTube link for free workshops
+                      window.location.href = workshop.videoUrl;
+                    } else {
+                      // Navigate to workshop watch page for premium workshops
+                      nav(`/workshops/${id}/watch`);
+                    }
+                  }}
                   className="px-8 py-3"
                 >
                   Watch Now
                 </Button>
               ) : (
                 <Button
-                  onClick={handleEnroll}
-                  variant={workshop.isFree ? 'primary' : 'accent'}
+                  onClick={() => {
+                    if (workshop.isFree && workshop.videoUrl) {
+                      // Redirect to YouTube link for free workshops
+                      window.location.href = workshop.videoUrl;
+                    } else {
+                      // Handle enrollment for premium workshops
+                      handleEnroll();
+                    }
+                  }}
                   className="px-8 py-3"
                 >
-                  {workshop.isFree ? 'Enroll Free' : `Enroll for ₹${workshop.price}`}
+                  {workshop.isFree ? 'Watch Free' : `Enroll for ₹${workshop.price}`}
                 </Button>
               )}
             </div>

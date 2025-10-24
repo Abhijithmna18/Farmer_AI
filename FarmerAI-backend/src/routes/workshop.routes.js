@@ -13,6 +13,11 @@ const {
 
 // Public routes
 router.get('/', getAllWorkshops);
+
+// Workshop access check (protected, must come before /:id to avoid route collision)
+router.get('/:id/access', authenticateToken, checkWorkshopAccess);
+
+// Public route for getting workshop by ID (must come after /:id/access)
 router.get('/:id', getWorkshopById);
 
 // Protected routes (require authentication)
@@ -22,6 +27,5 @@ router.use(authenticateToken);
 router.post('/subscription/order', createWorkshopSubscriptionOrder);
 router.post('/subscription/verify', verifyWorkshopSubscriptionPayment);
 router.get('/subscriptions', getUserSubscriptions);
-router.get('/:id/access', checkWorkshopAccess);
 
 module.exports = router;

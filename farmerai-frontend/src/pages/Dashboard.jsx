@@ -32,9 +32,10 @@ export default function Dashboard() {
   const actionsRef = useRef();
   const leafRefs = useRef([]);
 
-  // removed interaction history fetch
-
+  // Fetch calendars when user changes
   useEffect(() => {
+    if (!user) return;
+    
     const fetchCalendars = async () => {
       try {
         setLoadingCalendars(true);
@@ -55,19 +56,30 @@ export default function Dashboard() {
           completedTasks: Math.floor(calendarsData.length * 1.5) // Mock calculation
         });
       } catch (err) {
+        console.error("Error fetching calendars:", err);
+        // Reset data on error to prevent showing old user's data
+        setCalendars([]);
+        setStats({
+          totalCrops: 0,
+          activeCalendars: 0,
+          upcomingTasks: 0,
+          completedTasks: 0
+        });
       } finally {
         setLoadingCalendars(false);
       }
     };
+    
     fetchCalendars();
-    // Load last event for Resume card
+    
+    // Load last event for Resume card (scoped to current user)
     try {
-      const raw = localStorage.getItem('lastEvent');
+      const raw = localStorage.getItem(`lastEvent_${user.id || user._id || user.email}`);
       if (raw) setLastEvent(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  // removed lastInteraction usage
+    } catch {
+      setLastEvent(null);
+    }
+  }, [user]);
 
   // Get current time for personalized greeting (localized)
   const { t } = useTranslation();
@@ -201,8 +213,6 @@ export default function Dashboard() {
   }, [userLoading]);
 
   if (userLoading) return <Loader size="lg" text={t('common:loadingInsights')} />;
-
-  // removed export functions
 
   return (
     <div 

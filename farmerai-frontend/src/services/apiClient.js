@@ -14,6 +14,11 @@ console.log('API Base URL:', API_BASE);
 // Add a timeout to prevent hanging requests
 apiClient.defaults.timeout = 10000; // 10 seconds
 
+// Disable caching for all requests
+apiClient.defaults.headers.common['Cache-Control'] = 'no-cache';
+apiClient.defaults.headers.common['Pragma'] = 'no-cache';
+apiClient.defaults.headers.common['Expires'] = '0';
+
 // Add request interceptor to add token if present and set proper Content-Type
 apiClient.interceptors.request.use((config) => {
   console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.url}`);
@@ -46,6 +51,11 @@ apiClient.interceptors.request.use((config) => {
       config.headers["Content-Type"] = "application/json";
     }
   }
+  
+  // Ensure no caching for requests
+  config.headers["Cache-Control"] = "no-cache";
+  config.headers["Pragma"] = "no-cache";
+  config.headers["Expires"] = "0";
   
   console.log('📤 Request headers:', config.headers);
   return config;
@@ -109,5 +119,17 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Function to clear any cached data
+apiClient.clearCache = () => {
+  // Clear browser cache if available
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      names.forEach(name => {
+        caches.delete(name);
+      });
+    });
+  }
+};
 
 export default apiClient;

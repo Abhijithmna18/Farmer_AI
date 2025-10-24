@@ -26,8 +26,8 @@ db.once('open', async () => {
       {
         title: 'Introduction to Organic Farming',
         description: 'Learn the basics of organic farming practices and how to transition from conventional to organic methods.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=9Ffm6JqV4hU', // Introduction to Organic Farming - YouTube tutorial
+        thumbnail: '/Introduction to Organic Farming.png',
+        videoUrl: 'https://youtu.be/EsyRd4WihUk?si=sLPLLu2zbxGFG_Ne', // Introduction to Organic Farming - YouTube tutorial
         duration: 45,
         category: 'beginner',
         level: 'beginner',
@@ -57,8 +57,8 @@ db.once('open', async () => {
       {
         title: 'Soil Testing Basics',
         description: 'Learn how to test your soil quality and understand the results to improve your crop yield.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=K5fFh5eWf8s', // Soil Testing Basics - YouTube tutorial
+        thumbnail: 'public/soil testing basics.png',
+        videoUrl: 'https://youtu.be/2xATIbYnUgM?si=aJMBrJ5vMkmvTIpt', // Soil Testing Basics - YouTube tutorial
         duration: 30,
         category: 'beginner',
         level: 'beginner',
@@ -93,8 +93,8 @@ db.once('open', async () => {
       {
         title: 'Water Conservation Techniques',
         description: 'Discover effective water conservation methods for sustainable farming in drought-prone areas.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=7vIi0U4rSX4', // Water Conservation Techniques - YouTube tutorial
+        thumbnail: '/Water Conservation Techniques.png',
+        videoUrl: 'https://youtu.be/gJmY3dzg3Gk?si=BgXptcRvd8UUmlWL', // Water Conservation Techniques - YouTube tutorial
         duration: 35,
         category: 'beginner',
         level: 'beginner',
@@ -126,8 +126,8 @@ db.once('open', async () => {
       {
         title: 'Advanced Crop Rotation Strategies',
         description: 'Master advanced crop rotation techniques to maximize yield and soil health over multiple seasons.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=8KZ5L2G8v5Y', // Advanced Crop Rotation - YouTube tutorial
+        thumbnail: '/Advanced Crop Rotation Strategies.png',
+        videoUrl: 'https://youtu.be/B2y1XR5UYGo?si=8tdhGJVMzxDUzK_k', // Advanced Crop Rotation - YouTube tutorial
         duration: 60,
         category: 'advanced',
         level: 'advanced',
@@ -158,8 +158,8 @@ db.once('open', async () => {
       {
         title: 'Precision Agriculture with Drones',
         description: 'Learn how to use drone technology for crop monitoring, spraying, and data collection.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=5KgH6W1R7xU', // Precision Agriculture with Drones - YouTube tutorial
+        thumbnail: '/Precision Agriculture with Drones.png',
+        videoUrl: 'https://youtu.be/9YqEtlv_qXY?si=BkYEy7WtcObelClN', // Precision Agriculture with Drones - YouTube tutorial
         duration: 90,
         category: 'specialized',
         level: 'intermediate',
@@ -190,8 +190,8 @@ db.once('open', async () => {
       {
         title: 'Integrated Pest Management',
         description: 'Comprehensive guide to managing pests using biological, cultural, and chemical methods.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+        thumbnail: '/Integrated Pest Management.png',
+        videoUrl: 'https://youtu.be/z2AMnP4nn2E?si=KF61c8PWt7go0v7p', // Placeholder
         duration: 75,
         category: 'intermediate',
         level: 'intermediate',
@@ -222,8 +222,8 @@ db.once('open', async () => {
       {
         title: 'Greenhouse Management',
         description: 'Master the art of greenhouse cultivation for year-round production and climate control.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+        thumbnail: '/Greenhouse Management.png',
+        videoUrl: 'https://youtu.be/eQSNKrigiOM?si=I3d0G-yeFrHTRLHH', // Placeholder
         duration: 80,
         category: 'specialized',
         level: 'intermediate',
@@ -254,8 +254,8 @@ db.once('open', async () => {
       {
         title: 'Sustainable Livestock Management',
         description: 'Learn ethical and sustainable practices for raising livestock while maintaining profitability.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+        thumbnail: '/Sustainable Livestock Management.png',
+        videoUrl: 'https://youtu.be/B0zKMQHc8ww?si=mJGAcFMARqcp_cKR', // Placeholder
         duration: 95,
         category: 'specialized',
         level: 'intermediate',
@@ -286,8 +286,8 @@ db.once('open', async () => {
       {
         title: 'Agri-Tourism Business Development',
         description: 'Turn your farm into a profitable agri-tourism destination with marketing and visitor management strategies.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+        thumbnail: '/Agri-Tourism Business Development.png',
+        videoUrl: 'https://youtu.be/HRzFXkZ1cTA?si=gE7OMZ6YV4TIZQ32', // Placeholder
         duration: 70,
         category: 'specialized',
         level: 'intermediate',
@@ -318,8 +318,8 @@ db.once('open', async () => {
       {
         title: 'Climate-Resilient Farming',
         description: 'Adapt your farming practices to climate change with resilient crop varieties and techniques.',
-        thumbnail: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+        thumbnail: '/Climate-Resilient Farming.png',
+        videoUrl: 'https://youtu.be/6HmtTEZ2sEU?si=5E7bsAd8dyMsmW_j', // Placeholder
         duration: 85,
         category: 'advanced',
         level: 'advanced',

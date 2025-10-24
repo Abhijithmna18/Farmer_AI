@@ -17,6 +17,9 @@ const galleryItems = [
 
 // GalleryCard Component
 const GalleryCard = ({ item, onClick }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
   return (
     <motion.div
       className={`${glass.card} relative group cursor-pointer overflow-hidden rounded-xl`}
@@ -24,10 +27,32 @@ const GalleryCard = ({ item, onClick }) => {
       transition={{ duration: 0.3 }}
       onClick={() => onClick(item)}
     >
+      {/* Loading state */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
+          <div className="w-6 h-6 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+      
+      {/* Error state */}
+      {hasError && (
+        <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center p-2 text-center">
+          <div className="text-2xl mb-1">📷</div>
+          <div className="text-gray-500 dark:text-gray-400 text-xs">Image unavailable</div>
+        </div>
+      )}
+      
       <img
         src={item.src}
         alt={item.alt}
-        className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
+        className={`w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110 ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
       />
       <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <motion.div
@@ -46,6 +71,9 @@ const GalleryCard = ({ item, onClick }) => {
 
 // ImageModal Component
 const ImageModal = ({ item, onClose, onNext, onPrev }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
   if (!item) return null;
 
   return (
@@ -70,7 +98,41 @@ const ImageModal = ({ item, onClose, onNext, onPrev }) => {
         >
           &times;
         </button>
-        <img src={item.src} alt={item.alt} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md" />
+        
+        {/* Loading state */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-800 z-10">
+            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+        
+        {/* Error state */}
+        {hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 z-10 p-4 text-center">
+            <div className="text-6xl mb-4">📷</div>
+            <h3 className="text-xl font-semibold text-white mb-2">{item.title}</h3>
+            <p className="text-gray-300">Unable to load image</p>
+            <button 
+              onClick={onClose}
+              className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Close
+            </button>
+          </div>
+        )}
+        
+        <img 
+          src={item.src} 
+          alt={item.alt} 
+          className={`max-w-full max-h-[70vh] object-contain mx-auto rounded-md ${
+            isLoading ? 'opacity-0' : 'opacity-100'
+          }`}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setHasError(true);
+          }}
+        />
         <div className="text-center mt-4">
           <h3 className="text-xl font-semibold text-white">{item.title}</h3>
           {item.description && <p className="text-gray-300 text-sm mt-1">{item.description}</p>}

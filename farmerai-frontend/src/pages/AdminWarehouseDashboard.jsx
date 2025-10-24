@@ -342,7 +342,7 @@ const AdminWarehouseDashboard = ({ initialTab = 'overview' }) => {
         <div>
           <h3 className="text-lg font-semibold text-gray-900">#{booking.bookingId}</h3>
           <p className="text-sm text-gray-600">
-            {booking.farmer.firstName} {booking.farmer.lastName} → {booking.warehouse.name}
+            {booking.farmer?.firstName || 'Unknown'} {booking.farmer?.lastName || ''} → {booking.warehouse?.name || 'Unknown Warehouse'}
           </p>
         </div>
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
@@ -468,7 +468,7 @@ const AdminWarehouseDashboard = ({ initialTab = 'overview' }) => {
         <div>
           <h3 className="text-lg font-semibold text-gray-900">#{payment.paymentId || (payment._id ? payment._id.slice(-6) : 'PAY')}</h3>
           <p className="text-sm text-gray-600">
-            {payment.farmer?.firstName} {payment.farmer?.lastName} → {payment.warehouseOwner?.firstName} {payment.warehouseOwner?.lastName}
+            {payment.farmer?.firstName || 'Unknown'} {payment.farmer?.lastName || ''} → {payment.warehouseOwner?.firstName || 'Unknown'} {payment.warehouseOwner?.lastName || ''}
           </p>
         </div>
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
@@ -1202,15 +1202,15 @@ const DetailsModal = ({ item, onClose }) => {
                     {item.farmer && (
                       <div>
                         <label className="text-sm font-medium text-gray-600">Farmer</label>
-                        <p className="text-gray-900">{item.farmer.firstName} {item.farmer.lastName}</p>
-                        <p className="text-sm text-gray-500">{item.farmer.email}</p>
+                        <p className="text-gray-900">{item.farmer.firstName || 'Unknown'} {item.farmer.lastName || ''}</p>
+                        <p className="text-sm text-gray-500">{item.farmer.email || 'No email'}</p>
                       </div>
                     )}
                     {item.warehouseOwner && (
                       <div>
                         <label className="text-sm font-medium text-gray-600">Warehouse Owner</label>
-                        <p className="text-gray-900">{item.warehouseOwner.firstName} {item.warehouseOwner.lastName}</p>
-                        <p className="text-sm text-gray-500">{item.warehouseOwner.email}</p>
+                        <p className="text-gray-900">{item.warehouseOwner.firstName || 'Unknown'} {item.warehouseOwner.lastName || ''}</p>
+                        <p className="text-sm text-gray-500">{item.warehouseOwner.email || 'No email'}</p>
                       </div>
                     )}
                   </div>
@@ -1235,11 +1235,11 @@ const DetailsModal = ({ item, onClose }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Farmer</label>
-                    <p className="text-gray-900">{item.farmer?.firstName} {item.farmer?.lastName}</p>
+                    <p className="text-gray-900">{item.farmer?.firstName || 'Unknown'} {item.farmer?.lastName || ''}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Warehouse</label>
-                    <p className="text-gray-900">{item.warehouse?.name}</p>
+                    <p className="text-gray-900">{item.warehouse?.name || 'Unknown Warehouse'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Produce Type</label>

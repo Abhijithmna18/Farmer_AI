@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workshopService } from '../services/workshopService';
 import Button from '../components/Button';
+import useAuth from '../hooks/useAuth'; // Add this import
 
 const WorkshopTutorials = () => {
   const nav = useNavigate();
+  const { user } = useAuth(); // Get user from auth context
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
+
+  // Check if user has an active subscription
+  const hasActiveSubscription = user && user.hasActiveSubscription;
 
   useEffect(() => {
     fetchWorkshops();
@@ -137,9 +142,13 @@ const WorkshopTutorials = () => {
               >
                 <div className="relative">
                   <img
-                    src={workshop.thumbnail}
+                    src={workshop.thumbnail || `/${workshop.title}.png`}
                     alt={workshop.title}
                     className="w-full h-48 object-cover"
+                    onError={(e) => {
+                      // Fallback to lowercase with spaces replaced by underscores
+                      e.target.src = `/${workshop.title.toLowerCase().replace(/\s+/g, '_')}.png`;
+                    }}
                   />
                   {!workshop.isFree && (
                     <div className="absolute top-4 right-4 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded">
@@ -173,11 +182,26 @@ const WorkshopTutorials = () => {
                       <span className="text-sm text-gray-700">{workshop.instructor.name}</span>
                     </div>
                     <Button
-                      onClick={() => nav(`/workshops/${workshop._id}`)}
+                      onClick={() => {
+                        if (workshop.isFree && workshop.videoUrl) {
+                          // Redirect to YouTube link for free workshops
+                          window.location.href = workshop.videoUrl;
+                        } else if (hasActiveSubscription || workshop.isFree) {
+                          // For subscribed users or free workshops, navigate to watch page
+                          nav(`/workshops/${workshop._id}/watch`);
+                        } else {
+                          // Navigate to workshop detail page for premium workshops (non-subscribed users)
+                          nav(`/workshops/${workshop._id}`);
+                        }
+                      }}
                       variant={workshop.isFree ? 'primary' : 'accent'}
                       className="text-sm"
                     >
-                      {workshop.isFree ? 'Watch Free' : `₹${workshop.price}`}
+                      {workshop.isFree 
+                        ? 'Watch Free' 
+                        : hasActiveSubscription 
+                          ? 'Watch Now' 
+                          : `₹${workshop.price}`}
                     </Button>
                   </div>
                 </div>
@@ -186,30 +210,56 @@ const WorkshopTutorials = () => {
           </div>
         )}
 
-        {/* Subscription CTA */}
-        <div className="mt-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">Get Unlimited Access to Premium Content</h2>
-          <p className="mb-6 max-w-2xl mx-auto">
-            Subscribe to our monthly or yearly plan and get access to all premium workshops, 
-            exclusive content, and expert support.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+        {/* Subscription CTA - Only show for non-subscribed users */}
+        {!hasActiveSubscription && (
+          <div className="mt-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl p-8 text-center text-white">
+            <h2 className="text-2xl font-bold mb-4">Get Unlimited Access to Premium Content</h2>
+            <p className="mb-6 max-w-2xl mx-auto">
+              Subscribe to our monthly or yearly plan and get access to all premium workshops, 
+              exclusive content, and expert support.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Button
+                onClick={() => nav('/subscription/monthly')}
+                variant="secondary"
+                className="bg-white text-green-600 hover:bg-gray-100"
+              >
+                Monthly Plan - ₹499/month
+              </Button>
+              <Button
+                onClick={() => nav('/subscription/yearly')}
+                variant="secondary"
+                className="bg-white text-green-600 hover:bg-gray-100"
+              >
+                Yearly Plan - ₹4999/year (Save 20%)
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Confirmation - Only show for subscribed users */}
+        {hasActiveSubscription && (
+          <div className="mt-16 bg-gradient-to-r from-green-100 to-blue-100 rounded-2xl p-8 text-center border border-green-200">
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">You're a Premium Member!</h2>
+            <p className="text-gray-700 mb-4">
+              Enjoy unlimited access to all workshops. Start learning now!
+            </p>
             <Button
-              onClick={() => nav('/subscription/monthly')}
-              variant="secondary"
-              className="bg-white text-green-600 hover:bg-gray-100"
+              onClick={() => nav('/subscription/manage')}
+              variant="primary"
+              className="bg-green-600 hover:bg-green-700"
             >
-              Monthly Plan - ₹499/month
-            </Button>
-            <Button
-              onClick={() => nav('/subscription/yearly')}
-              variant="secondary"
-              className="bg-white text-green-600 hover:bg-gray-100"
-            >
-              Yearly Plan - ₹4999/year (Save 20%)
+              Manage Subscription
             </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

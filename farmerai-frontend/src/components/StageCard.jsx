@@ -22,8 +22,19 @@ const StageCard = ({ stage, isActive }) => {
     transform: isActive ? 'translateY(-10px)' : 'translateY(0)',
   };
 
+  // Dark mode adjustments
+  const darkModeStyle = {
+    background: isActive 
+      ? 'rgba(30, 41, 59, 0.4)' 
+      : 'rgba(30, 41, 59, 0.61)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+  };
+
   return (
-    <div style={cardStyle} className="p-6 text-gray-800 dark:text-gray-200">
+    <div 
+      style={cardStyle} 
+      className="p-6 text-gray-800 dark:text-gray-200"
+    >
       <h3 className="text-2xl font-bold mb-3 text-green-800 dark:text-green-300">{stage.stageName}</h3>
       
       <p className="text-sm mb-4 font-light italic">
@@ -58,7 +69,7 @@ const StageCard = ({ stage, isActive }) => {
           <h4 className="font-semibold text-lg mb-2">Tasks</h4>
           <ul className="list-disc list-inside space-y-1">
             {stage.tasks.map(task => (
-              <li key={task._id} className={task.isCompleted ? 'line-through text-gray-500' : ''}>
+              <li key={task._id} className={task.isCompleted ? 'line-through text-gray-500 dark:text-gray-400' : ''}>
                 {task.name}
               </li>
             ))}

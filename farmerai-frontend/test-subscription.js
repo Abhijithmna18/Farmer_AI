@@ -27,6 +27,13 @@ async function testSubscriptionOrder() {
     console.log('Response status:', response.status);
     console.log('Response headers:', response.headers);
     
+    // Check if response is OK before parsing JSON
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response text:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+    
     const data = await response.json();
     console.log('Response data:', data);
     

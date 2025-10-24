@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Subscription Order</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Subscription Order Creation</h1>
+    
+    <div class="form-group">
+        <label for="token">Authentication Token:</label>
+        <input type="text" id="token" placeholder="Enter your JWT token">
+    </div>
+    
+    <div class="form-group">
+        <label for="subscriptionType">Subscription Type:</label>
+        <select id="subscriptionType">
+            <option value="monthly">Monthly (₹499)</option>
+            <option value="yearly">Yearly (₹4999)</option>
+            <option value="workshop">Workshop Purchase</option>
+        </select>
+    </div>
+    
+    <div class="form-group" id="workshopIdGroup" style="display: none;">
+        <label for="workshopId">Workshop ID:</label>
+        <input type="text" id="workshopId" placeholder="Enter workshop ID">
+    </div>
+    
+    <button id="createOrder">Create Subscription Order</button>
+    
+    <div id="result"></div>
+
+    <script>
+        // Show/hide workshop ID field based on subscription type
+        document.getElementById('subscriptionType').addEventListener('change', function() {
+            const workshopIdGroup = document.getElementById('workshopIdGroup');
+            if (this.value === 'workshop') {
+                workshopIdGroup.style.display = 'block';
+            } else {
+                workshopIdGroup.style.display = 'none';
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('createOrder').addEventListener('click', async function() {
+            const token = document.getElementById('token').value;
+            const subscriptionType = document.getElementById('subscriptionType').value;
+            const workshopId = document.getElementById('workshopId').value;
+            
+            if (!token) {
+                showResult('Please enter an authentication token', 'error');
+                return;
+            }
+            
+            const requestBody = {
+                type: subscriptionType
+            };
+            
+            if (subscriptionType === 'workshop') {
+                if (!workshopId) {
+                    showResult('Please enter a workshop ID', 'error');
+                    return;
+                }
+                requestBody.workshopId = workshopId;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:5002/api/workshops/subscription/order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const responseText = await response.text();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
+                }
+                
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`Invalid JSON response: ${responseText}`);
+                }
+                
+                showResult(`Success: ${JSON.stringify(responseData, null, 2)}`, 'success');
+            } catch (error) {
+                showResult(`Error: ${error.message}`, 'error');
+            }
+        });
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<pre class="${type}">${message}</pre>`;
+        }
+    </script>
+</body>
+</html>

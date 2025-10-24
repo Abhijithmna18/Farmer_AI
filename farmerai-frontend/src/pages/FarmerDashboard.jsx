@@ -147,8 +147,10 @@ const FarmerDashboard = () => {
     >
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{booking.warehouse.name}</h3>
-          <p className="text-sm text-gray-600">{booking.warehouse.location.city}, {booking.warehouse.location.state}</p>
+          <h3 className="text-lg font-semibold text-gray-900">{booking.warehouse?.name || 'Unknown Warehouse'}</h3>
+          <p className="text-sm text-gray-600">
+            {booking.warehouse?.location?.city || 'Unknown City'}, {booking.warehouse?.location?.state || 'Unknown State'}
+          </p>
         </div>
         <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
           {getStatusIcon(booking.status)}
@@ -437,10 +439,10 @@ const BookingDetailsModal = ({ booking, onClose, onCancel }) => {
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <MapPinIcon className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{booking.warehouse.name}</span>
+                <span className="font-medium">{booking.warehouse?.name || 'Unknown Warehouse'}</span>
               </div>
               <p className="text-gray-600 text-sm ml-6">
-                {booking.warehouse.location.city}, {booking.warehouse.location.state}
+                {booking.warehouse?.location?.city || 'Unknown City'}, {booking.warehouse?.location?.state || 'Unknown State'}
               </p>
             </div>
           </div>

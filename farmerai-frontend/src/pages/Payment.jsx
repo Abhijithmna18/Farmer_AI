@@ -134,7 +134,7 @@ const Payment = () => {
         amount: booking.pricing.totalAmount * 100,
         currency: 'INR',
         name: 'FarmerAI',
-        description: `Booking for ${booking.warehouse.name}`,
+        description: `Booking for ${booking.warehouse?.name || 'Unknown Warehouse'}`,
         order_id: orderData.orderId,
         handler: async function (response) {
           try {
@@ -169,9 +169,9 @@ const Payment = () => {
           }
         },
         prefill: {
-          name: booking.farmer.firstName + ' ' + booking.farmer.lastName,
-          email: booking.farmer.email,
-          contact: booking.farmer.phone || ''
+          name: (booking.farmer?.firstName || '') + ' ' + (booking.farmer?.lastName || ''),
+          email: booking.farmer?.email || '',
+          contact: booking.farmer?.phone || ''
         },
         theme: {
           color: '#10B981'
@@ -269,10 +269,10 @@ const Payment = () => {
                 
                 {/* Warehouse Info */}
                 <div className="border-b border-gray-200 pb-4 mb-4">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">{booking.warehouse.name}</h3>
-                  <p className="text-gray-600 mb-2">{booking.warehouse.location.address}</p>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">{booking.warehouse?.name || 'Unknown Warehouse'}</h3>
+                  <p className="text-gray-600 mb-2">{booking.warehouse?.location?.address || 'Address not available'}</p>
                   <div className="flex items-center text-sm text-gray-500">
-                    <span>Capacity: {booking.warehouse.capacity.available} {booking.warehouse.capacity.unit}</span>
+                    <span>Capacity: {booking.warehouse?.capacity?.available || 0} {booking.warehouse?.capacity?.unit || ''}</span>
                   </div>
                 </div>
 

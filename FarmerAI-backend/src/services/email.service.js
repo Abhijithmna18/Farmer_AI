@@ -327,6 +327,43 @@ const emailTemplates = {
     `
   }),
 
+  subscriptionConfirmation: (data) => ({
+    subject: 'Welcome to FarmerAI Premium - Subscription Confirmed!',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d5016; text-align: center;">Thank You for Subscribing!</h2>
+        <p>Dear ${data.userName},</p>
+        <p>Congratulations and welcome to FarmerAI Premium! Your subscription has been successfully confirmed.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <h3 style="color: #2d5016;">🎉 Unlimited Access Unlocked! 🎉</h3>
+          <p>You now have unlimited access to all our premium workshops, expert-led tutorials, and exclusive farming insights.</p>
+        </div>
+        
+        <div style="background-color: #e8f4e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>What's Included in Your Premium Membership:</h3>
+          <ul>
+            <li>✅ Access to all premium workshops and tutorials</li>
+            <li>✅ Expert advice from agricultural specialists</li>
+            <li>✅ Advanced farming techniques and seasonal guides</li>
+            <li>✅ Priority customer support</li>
+            <li>✅ Regular updates with the latest farming innovations</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/workshops" style="background-color: #2d5016; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Start Learning Now</a>
+        </div>
+        
+        <p>We're excited to support your farming journey with our premium content. Our experts have curated practical, actionable insights that can help improve your yields and farm efficiency.</p>
+        
+        <p>If you have any questions about your subscription or need assistance getting started, please don't hesitate to contact our support team.</p>
+        
+        <p>Happy farming!<br>The FarmerAI Team</p>
+      </div>
+    `
+  }),
+
   // Warehouse booking reminder template
   warehouseBookingReminder: (data) => ({
     subject: `Warehouse Booking Reminder - ${data.warehouseName}`,
@@ -620,6 +657,11 @@ const sendWarehouseOwnerReminder = async (ownerEmail, bookingData) => {
   return sendEmail(ownerEmail, 'warehouseOwnerReminder', bookingData);
 };
 
+// Send subscription confirmation email
+const sendSubscriptionConfirmation = async (userEmail, userData) => {
+  return sendEmail(userEmail, 'subscriptionConfirmation', userData);
+};
+
 module.exports = {
   sendEmail,
   sendRawEmail,
@@ -634,5 +676,6 @@ module.exports = {
   sendWarehouseApproved,
   sendWarehouseRejected,
   sendWarehouseBookingReminder, // Added export
-  sendWarehouseOwnerReminder    // Added export
+  sendWarehouseOwnerReminder,   // Added export
+  sendSubscriptionConfirmation  // Added export
 };

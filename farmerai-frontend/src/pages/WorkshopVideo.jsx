@@ -31,10 +31,10 @@ const WorkshopVideo = () => {
   const checkAccess = async () => {
     try {
       const response = await workshopService.checkWorkshopAccess(id);
-      setHasAccess(response.data.data.hasAccess);
+      setHasAccess(response.data.hasAccess);
       
       // If no access, redirect to detail page
-      if (!response.data.data.hasAccess) {
+      if (!response.data.hasAccess) {
         nav(`/workshops/${id}`);
       }
     } catch (err) {

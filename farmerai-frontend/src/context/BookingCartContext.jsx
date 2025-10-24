@@ -1,5 +1,6 @@
 // src/context/BookingCartContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import useAuth from '../hooks/useAuth';
 
 const BookingCartContext = createContext();
 
@@ -14,6 +15,7 @@ export const useBookingCart = () => {
 export const BookingCartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { user } = useAuth(); // Get current user
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -31,6 +33,14 @@ export const BookingCartProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('bookingCart', JSON.stringify(cartItems));
   }, [cartItems]);
+
+  // Clear cart when user changes (logout/login)
+  useEffect(() => {
+    if (!user) {
+      // Clear cart when no user is logged in
+      setCartItems([]);
+    }
+  }, [user]);
 
   const addToCart = (warehouse, bookingData) => {
     const cartItem = {
@@ -91,28 +101,3 @@ export const BookingCartProvider = ({ children }) => {
     </BookingCartContext.Provider>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
