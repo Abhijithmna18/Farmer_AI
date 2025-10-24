@@ -62,6 +62,13 @@ apiClient.interceptors.request.use((config) => {
     config.timeout = 300000; // 5 minutes (300 seconds) for plant identification to match backend
     console.log('⏱️ Increased timeout to 5 minutes for plant identification');
   }
+
+  // Increase timeout for auth endpoints to tolerate cold starts on backend (e.g., Render)
+  if (config.url && (config.url.includes('/auth/login') || config.url.includes('/auth/register') || config.url.includes('/auth/me'))) {
+    // Use a more generous timeout for initial auth flows
+    config.timeout = Math.max(config.timeout || 0, 30000); // at least 30 seconds
+    console.log('⏱️ Increased timeout to 30s for auth endpoint');
+  }
   
   console.log('📤 Request headers:', config.headers);
   return config;
