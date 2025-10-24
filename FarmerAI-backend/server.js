@@ -44,12 +44,14 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'https://rococo-muffin-945590.netlify.app', // Production frontend
 ];
 
 // Add production frontend URL from environment variable
 if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-  logger.info(`Added production frontend URL to CORS: ${process.env.FRONTEND_URL}`);
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // Remove trailing slash
+  allowedOrigins.push(frontendUrl);
+  logger.info(`Added production frontend URL to CORS: ${frontendUrl}`);
 }
 
 const corsOptions = {
