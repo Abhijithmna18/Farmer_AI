@@ -175,3 +175,10 @@ if (require.main === module) {
     }
   });
 }
+  app.get("/", (req, res) => {
+  res.send("🌾 FarmerAI Backend Live and Healthy");
+});
+
+  app.get("/api/health", (req, res) => {
+  res.send("✅ FarmerAI Backend Running Successfully");
+});
