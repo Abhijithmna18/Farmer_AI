@@ -45,6 +45,13 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
 ];
+
+// Add production frontend URL from environment variable
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+  logger.info(`Added production frontend URL to CORS: ${process.env.FRONTEND_URL}`);
+}
+
 const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
@@ -175,10 +182,3 @@ if (require.main === module) {
     }
   });
 }
-  app.get("/", (req, res) => {
-  res.send("🌾 FarmerAI Backend Live and Healthy");
-});
-
-  app.get("/api/health", (req, res) => {
-  res.send("✅ FarmerAI Backend Running Successfully");
-});
