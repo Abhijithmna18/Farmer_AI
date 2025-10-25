@@ -19,6 +19,12 @@ const app = express();
 
 // Create upload directories if they don't exist
 const createUploadDirectories = () => {
+  // Skip directory creation on Vercel (serverless environment)
+  if (process.env.VERCEL) {
+    logger.info('Running on Vercel - skipping upload directory creation');
+    return;
+  }
+  
   const uploadDirs = [
     path.join(__dirname, 'uploads'),
     path.join(__dirname, 'uploads', 'profile-pictures'),
@@ -75,7 +81,9 @@ app.use('/uploads/profile-pictures', express.static(path.join(__dirname, 'upload
 app.use('/uploads/warehouses', express.static(path.join(__dirname, 'uploads', 'warehouses')));
 
 // Connect Database
-connectDB();
+if (!process.env.VERCEL) {
+  connectDB();
+}
 
 // Routes
 app.use('/api/auth', require('./src/routes/auth.routes'));
@@ -120,8 +128,15 @@ app.get('/', (req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-// Export app for testing
+// Export app for Vercel and testing
 module.exports = app;
+
+// For Vercel serverless, connect to DB on each request
+if (process.env.VERCEL) {
+  connectDB().catch(err => {
+    logger.error('Failed to connect to database:', err);
+  });
+}
 
 // Start server only if this file is run directly (not imported for testing)
 if (require.main === module) {
