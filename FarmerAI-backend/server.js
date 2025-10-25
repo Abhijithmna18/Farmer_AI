@@ -129,14 +129,23 @@ if (require.main === module) {
   const server = http.createServer(app);
   // Initialize Socket.IO realtime service
   try {
-    initRealtime(server, [
+    const socketOrigins = [
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:5175', // Added 5175
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
-      'http://127.0.0.1:5175' // Added 5175
-    ]);
+      'http://127.0.0.1:5175', // Added 5175
+      'https://rococo-muffin-945590.netlify.app' // Production frontend
+    ];
+    
+    // Add production frontend URL from environment variable
+    if (process.env.FRONTEND_URL) {
+      const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+      socketOrigins.push(frontendUrl);
+    }
+    
+    initRealtime(server, socketOrigins);
     logger.info('🔌 Realtime service initialized');
   } catch (e) {
     logger.error('Failed to initialize realtime service:', e?.message || e);
