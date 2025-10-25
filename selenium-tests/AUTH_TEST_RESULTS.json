@@ -1,0 +1,57 @@
+{
+  "tests": [
+    {
+      "name": "Navigate to Login Page",
+      "status": "FAILED",
+      "details": "URL: http://localhost:5174/login, Form found: false"
+    },
+    {
+      "name": "Login Form Elements",
+      "status": "FAILED",
+      "details": "Email: true, Password: true, Login: true, Register: false"
+    },
+    {
+      "name": "Invalid Login",
+      "status": "FAILED",
+      "details": "invalid session id: session deleted as the browser has closed the connection\nfrom disconnected: Unable to receive message from renderer\n  (Session info: chrome=141.0.7390.108)"
+    },
+    {
+      "name": "Navigate to Register Page",
+      "status": "FAILED",
+      "details": "invalid session id"
+    },
+    {
+      "name": "Register Form Elements",
+      "status": "FAILED",
+      "details": ""
+    },
+    {
+      "name": "Password Validation",
+      "status": "FAILED",
+      "details": "invalid session id"
+    },
+    {
+      "name": "Email Format Validation",
+      "status": "FAILED",
+      "details": "invalid session id"
+    },
+    {
+      "name": "Form Labels and Accessibility",
+      "status": "WARNING",
+      "details": "No form labels found"
+    },
+    {
+      "name": "Navigation Between Auth Pages",
+      "status": "FAILED",
+      "details": "invalid session id"
+    },
+    {
+      "name": "UI Responsiveness",
+      "status": "WARNING",
+      "details": "invalid session id"
+    }
+  ],
+  "passed": 0,
+  "failed": 10,
+  "total": 10
+}

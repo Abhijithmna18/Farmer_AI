@@ -1,0 +1,38 @@
+{
+  "browsers": ["chrome"],
+  "headless": false,
+  "parallel": false,
+  "timeout": 30000,
+  "retries": 2,
+  "screenshots": {
+    "onFailure": true,
+    "onSuccess": false,
+    "directory": "./screenshots"
+  },
+  "reports": {
+    "directory": "./test-results",
+    "format": "json",
+    "includeScreenshots": true
+  },
+  "performance": {
+    "pageLoadTimeout": 10000,
+    "implicitWait": 5000,
+    "explicitWait": 10000
+  },
+  "security": {
+    "validateSSL": true,
+    "checkXSS": true,
+    "checkCSRF": true
+  },
+  "accessibility": {
+    "enabled": true,
+    "level": "AA",
+    "includeColorContrast": true
+  },
+  "mobile": {
+    "enabled": false,
+    "devices": ["iPhone 12", "Samsung Galaxy S21"],
+    "orientation": "portrait"
+  }
+}
+

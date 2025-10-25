@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-10-25T05:08:55.110Z",
+  "summary": {
+    "totalTests": 4,
+    "passedTests": 4,
+    "failedTests": 0,
+    "executionTime": "19.73s"
+  },
+  "testResults": [
+    {
+      "testName": "Simple WebDriver Check",
+      "status": "PASSED",
+      "details": "WebDriver initialized and page loaded successfully",
+      "executionTime": "N/A"
+    },
+    {
+      "testName": "Farmer AI Application Access",
+      "status": "PASSED",
+      "details": "Successfully accessed Farmer AI application - Title: FarmerAI - Smart Agriculture Platform",
+      "executionTime": "N/A"
+    },
+    {
+      "testName": "Test Data Configuration",
+      "status": "PASSED",
+      "details": ".env file configured correctly",
+      "executionTime": "N/A"
+    },
+    {
+      "testName": "Test Helpers Functionality",
+      "status": "PASSED",
+      "details": "All required helper files present",
+      "executionTime": "N/A"
+    }
+  ],
+  "environment": {
+    "os": "win32",
+    "nodeVersion": "v22.14.0",
+    "workingDirectory": "D:\\New folder\\intern\\Farmer_AI\\selenium-tests"
+  }
+}

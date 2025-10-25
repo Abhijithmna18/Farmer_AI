@@ -1,0 +1,31 @@
+{
+  "name": "farmer-ai-selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium WebDriver tests for Farmer AI application",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha tests/**/*.js --timeout 30000",
+    "test:auth": "mocha tests/auth/*.js --timeout 30000",
+    "test:dashboard": "mocha tests/dashboard/*.js --timeout 30000",
+    "test:warehouse": "mocha tests/warehouse/*.js --timeout 30000",
+    "test:payment": "mocha tests/payment/*.js --timeout 30000",
+    "test:admin": "mocha tests/admin/*.js --timeout 30000",
+    "test:all": "mocha tests/**/*.js --timeout 60000",
+    "test:headless": "mocha tests/**/*.js --timeout 30000 --env headless",
+    "test:chrome": "mocha tests/**/*.js --timeout 30000 --env chrome",
+    "test:firefox": "mocha tests/**/*.js --timeout 30000 --env firefox"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.15.0",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0",
+    "moment": "^2.29.4"
+  },
+  "devDependencies": {
+    "chromedriver": "^119.0.1",
+    "geckodriver": "^4.2.1"
+  }
+}
+

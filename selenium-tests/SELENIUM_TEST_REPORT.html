@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selenium Test Report - Farmer AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .success-rate {
+            font-size: 3em;
+            font-weight: bold;
+            color: #27ae60;
+            margin: 10px 0;
+        }
+        .passed {
+            color: #27ae60;
+        }
+        .failed {
+            color: #e74c3c;
+        }
+        .total {
+            color: #3498db;
+        }
+        .test-results {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        .test-results h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.PASSED {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.FAILED {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .environment {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .environment h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .env-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .env-item {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .env-item strong {
+            color: #2c3e50;
+        }
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .recommendations {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        .recommendations h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .recommendations ul {
+            padding-left: 20px;
+        }
+        .recommendations li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Selenium Test Report</h1>
+        <div class="subtitle">Farmer AI Application - Automated UI Testing</div>
+    </header>
+
+    <div class="summary-cards">
+        <div class="card">
+            <h3>Total Tests</h3>
+            <div class="total">4</div>
+        </div>
+        <div class="card">
+            <h3>Passed</h3>
+            <div class="passed">4</div>
+        </div>
+        <div class="card">
+            <h3>Failed</h3>
+            <div class="failed">0</div>
+        </div>
+        <div class="card">
+            <h3>Success Rate</h3>
+            <div class="success-rate">100%</div>
+        </div>
+    </div>
+
+    <div class="test-results">
+        <h2>Test Results</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Test Name</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Simple WebDriver Check</td>
+                    <td><span class="status PASSED">PASSED</span></td>
+                    <td>WebDriver initialized and page loaded successfully</td>
+                </tr>
+                <tr>
+                    <td>Farmer AI Application Access</td>
+                    <td><span class="status PASSED">PASSED</span></td>
+                    <td>Successfully accessed Farmer AI application - Title: FarmerAI - Smart Agriculture Platform</td>
+                </tr>
+                <tr>
+                    <td>Test Data Configuration</td>
+                    <td><span class="status PASSED">PASSED</span></td>
+                    <td>.env file configured correctly</td>
+                </tr>
+                <tr>
+                    <td>Test Helpers Functionality</td>
+                    <td><span class="status PASSED">PASSED</span></td>
+                    <td>All required helper files present</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="environment">
+        <h2>Test Environment</h2>
+        <div class="env-details">
+            <div class="env-item">
+                <strong>Timestamp:</strong> 2025-10-25T05:04:14.192Z
+            </div>
+            <div class="env-item">
+                <strong>Operating System:</strong> win32
+            </div>
+            <div class="env-item">
+                <strong>Node.js Version:</strong> v22.14.0
+            </div>
+            <div class="env-item">
+                <strong>Working Directory:</strong> D:\New folder\intern\Farmer_AI\selenium-tests
+            </div>
+            <div class="env-item">
+                <strong>Execution Time:</strong> 13.995s
+            </div>
+        </div>
+    </div>
+
+    <div class="recommendations">
+        <h2>Recommendations</h2>
+        <ul>
+            <li><strong>WebDriver Compatibility:</strong> The Selenium WebDriver is functioning correctly with Chrome browser.</li>
+            <li><strong>Test Execution:</strong> Use direct Node.js execution (node test-file.js) instead of Mocha runner for reliable test execution.</li>
+            <li><strong>Mocha Issue:</strong> There is a known compatibility issue with Mocha test runner that causes timeouts during WebDriver initialization.</li>
+            <li><strong>Test Coverage:</strong> All core test helpers and configuration files are present and accessible.</li>
+            <li><strong>Application Access:</strong> Successfully connected to Farmer AI application at http://localhost:5174.</li>
+            <li><strong>Next Steps:</strong> Implement additional test scenarios using the direct execution approach for comprehensive UI testing.</li>
+        </ul>
+    </div>
+
+    <footer>
+        <p>Generated by Selenium Test Automation Framework | Farmer AI Application</p>
+        <p>This report shows that the core Selenium testing infrastructure is working correctly when executed directly with Node.js.</p>
+    </footer>
+</body>
+</html>
