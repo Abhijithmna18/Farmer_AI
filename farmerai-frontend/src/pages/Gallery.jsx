@@ -2,18 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import HomeButton from '../components/HomeButton';
 import { glass } from '../styles/globalStyles';
-
-// Placeholder data for gallery items
-const galleryItems = [
-  { id: 1, src: "/public/farm.jpg", title: "Soil Testing", description: "AI-powered soil analysis for optimal crop growth.", alt: "Soil being tested" },
-  { id: 2, src: "/public/image.png", title: "Healthy Crops", description: "Vibrant crops thriving with FarmerAI recommendations.", alt: "Healthy crops in a field" },
-  { id: 3, src: "/public/Community Event.png", title: "Community Event", description: "Farmers gathering at a local FarmerAI workshop.", alt: "Farmers at a community event" },
-  { id: 4, src: "/public/Planting Tutorial.png", title: "Planting Tutorial", description: "Step-by-step guide on efficient planting techniques.", alt: "Hands planting a seedling" },
-  { id: 5, src: "/public/New Crop Variety.png", title: "New Crop Variety", description: "Introducing a drought-resistant crop for arid regions.", alt: "New crop variety" },
-  { id: 6, src: "/public/Clay Soil.png", title: "Clay Soil", description: "Understanding the properties of clay soil for better management.", alt: "Close-up of clay soil" },
-  { id: 7, src: "/public/Harvest Festival.png", title: "Harvest Festival", description: "Celebrating a bountiful harvest with the FarmerAI community.", alt: "Harvest festival celebration" },
-  { id: 8, src: "/public/Irrigation Setup.png", title: "Irrigation Setup", description: "Setting up an automated irrigation system.", alt: "Irrigation system in a field" },
-];
+import apiClient from '../services/apiClient';
 
 // GalleryCard Component
 const GalleryCard = ({ item, onClick }) => {
@@ -43,8 +32,8 @@ const GalleryCard = ({ item, onClick }) => {
       )}
       
       <img
-        src={item.src}
-        alt={item.alt}
+        src={item.image?.url || item.src}
+        alt={item.image?.alt || item.alt}
         className={`w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110 ${
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
@@ -122,8 +111,8 @@ const ImageModal = ({ item, onClose, onNext, onPrev }) => {
         )}
         
         <img 
-          src={item.src} 
-          alt={item.alt} 
+          src={item.image?.url || item.src} 
+          alt={item.image?.alt || item.alt} 
           className={`max-w-full max-h-[70vh] object-contain mx-auto rounded-md ${
             isLoading ? 'opacity-0' : 'opacity-100'
           }`}
@@ -136,6 +125,13 @@ const ImageModal = ({ item, onClose, onNext, onPrev }) => {
         <div className="text-center mt-4">
           <h3 className="text-xl font-semibold text-white">{item.title}</h3>
           {item.description && <p className="text-gray-300 text-sm mt-1">{item.description}</p>}
+          {item.category && (
+            <div className="mt-2">
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                {item.category}
+              </span>
+            </div>
+          )}
         </div>
         <div className="absolute inset-y-0 left-0 flex items-center">
           <button
@@ -161,7 +157,41 @@ const ImageModal = ({ item, onClose, onNext, onPrev }) => {
 };
 
 const Gallery = () => {
+  const [galleryItems, setGalleryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+
+  // Fallback static data
+  const fallbackItems = [
+    { id: 1, src: "/farm.jpg", title: "Soil Testing", description: "AI-powered soil analysis for optimal crop growth.", alt: "Soil being tested", category: "farm" },
+    { id: 2, src: "/image.png", title: "Healthy Crops", description: "Vibrant crops thriving with FarmerAI recommendations.", alt: "Healthy crops in a field", category: "crops" },
+    { id: 3, src: "/Community Event.png", title: "Community Event", description: "Farmers gathering at a local FarmerAI workshop.", alt: "Farmers at a community event", category: "events" },
+    { id: 4, src: "/Planting Tutorial.png", title: "Planting Tutorial", description: "Step-by-step guide on efficient planting techniques.", alt: "Hands planting a seedling", category: "tutorials" },
+    { id: 5, src: "/New Crop Variety.png", title: "New Crop Variety", description: "Introducing a drought-resistant crop for arid regions.", alt: "New crop variety", category: "crops" },
+    { id: 6, src: "/Clay Soil.png", title: "Clay Soil", description: "Understanding the properties of clay soil for better management.", alt: "Close-up of clay soil", category: "soil" },
+    { id: 7, src: "/Harvest Festival.png", title: "Harvest Festival", description: "Celebrating a bountiful harvest with the FarmerAI community.", alt: "Harvest festival celebration", category: "events" },
+    { id: 8, src: "/Irrigation Setup.png", title: "Irrigation Setup", description: "Setting up an automated irrigation system.", alt: "Irrigation system in a field", category: "equipment" },
+  ];
+
+  useEffect(() => {
+    fetchGalleryItems();
+  }, []);
+
+  const fetchGalleryItems = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/gallery?isActive=true&limit=20');
+      const items = response.data?.data || response.data || [];
+      setGalleryItems(items);
+    } catch (err) {
+      console.error('Error fetching gallery items:', err);
+      setError('Failed to load gallery items. Showing fallback content.');
+      setGalleryItems(fallbackItems);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openModal = (item) => {
     setSelectedImage(item);
@@ -172,13 +202,13 @@ const Gallery = () => {
   };
 
   const goToNext = () => {
-    const currentIndex = galleryItems.findIndex(item => item.id === selectedImage.id);
+    const currentIndex = galleryItems.findIndex(item => (item._id || item.id) === (selectedImage._id || selectedImage.id));
     const nextIndex = (currentIndex + 1) % galleryItems.length;
     setSelectedImage(galleryItems[nextIndex]);
   };
 
   const goToPrev = () => {
-    const currentIndex = galleryItems.findIndex(item => item.id === selectedImage.id);
+    const currentIndex = galleryItems.findIndex(item => (item._id || item.id) === (selectedImage._id || selectedImage.id));
     const prevIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
     setSelectedImage(galleryItems[prevIndex]);
   };
@@ -202,6 +232,22 @@ const Gallery = () => {
     };
   }, [selectedImage]);
 
+  if (loading) {
+    return (
+      <motion.div
+        className="bg-gray-50 min-h-screen text-gray-800 flex items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+      >
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading gallery...</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className="bg-gray-50 min-h-screen text-gray-800"
@@ -216,13 +262,18 @@ const Gallery = () => {
         <div className="relative z-10">
           <h1 className="text-5xl font-bold">Gallery</h1>
           <p className="text-xl mt-4">Explore farming snapshots, tutorials, and event highlights</p>
+          {error && (
+            <div className="mt-4 text-yellow-200 text-sm">
+              {error}
+            </div>
+          )}
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {galleryItems.map((item) => (
-            <GalleryCard key={item.id} item={item} onClick={openModal} />
+            <GalleryCard key={item._id || item.id} item={item} onClick={openModal} />
           ))}
         </div>
       </main>

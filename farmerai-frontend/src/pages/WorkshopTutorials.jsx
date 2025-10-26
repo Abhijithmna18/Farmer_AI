@@ -1,25 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workshopService } from '../services/workshopService';
 import Button from '../components/Button';
-import useAuth from '../hooks/useAuth'; // Add this import
+import useAuth from '../hooks/useAuth';
 
 const WorkshopTutorials = () => {
   const nav = useNavigate();
-  const { user } = useAuth(); // Get user from auth context
+  const { user, loading: authLoading, refreshSubscriptionStatus } = useAuth();
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Check if user has an active subscription
   const hasActiveSubscription = user && user.hasActiveSubscription;
 
-  useEffect(() => {
-    fetchWorkshops();
-  }, []);
-
-  const fetchWorkshops = async () => {
+  const fetchWorkshops = useCallback(async () => {
     try {
       setLoading(true);
       const response = await workshopService.getAllWorkshops();
@@ -33,7 +31,39 @@ const WorkshopTutorials = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const checkSubscriptionAndFetchWorkshops = useCallback(async () => {
+    if (initialized) return; // Prevent multiple calls
+    
+    try {
+      setInitialized(true);
+      // Refresh subscription status to get latest data
+      await refreshSubscriptionStatus();
+      setSubscriptionChecked(true);
+      
+      // Fetch workshops after subscription check
+      await fetchWorkshops();
+    } catch (err) {
+      console.error('Error checking subscription status:', err);
+      // Still fetch workshops even if subscription check fails
+      await fetchWorkshops();
+    }
+  }, [refreshSubscriptionStatus, fetchWorkshops, initialized]);
+
+  useEffect(() => {
+    // Check authentication first
+    if (!authLoading) {
+      if (!user) {
+        // User not authenticated, redirect to login
+        nav('/login');
+        return;
+      }
+      
+      // User is authenticated, check subscription status and fetch workshops
+      checkSubscriptionAndFetchWorkshops();
+    }
+  }, [user, authLoading, checkSubscriptionAndFetchWorkshops]);
 
   const filteredWorkshops = (workshops || []).filter(workshop => {
     if (activeTab === 'all') return true;
@@ -49,7 +79,8 @@ const WorkshopTutorials = () => {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
-  if (loading) {
+  // Show loading while checking authentication or subscription
+  if (authLoading || loading || !subscriptionChecked) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -142,12 +173,12 @@ const WorkshopTutorials = () => {
               >
                 <div className="relative">
                   <img
-                    src={workshop.thumbnail || `/${workshop.title}.png`}
+                    src={workshop.thumbnail || workshop.youtubeThumbnail || '/default-workshop.png'}
                     alt={workshop.title}
                     className="w-full h-48 object-cover"
                     onError={(e) => {
-                      // Fallback to lowercase with spaces replaced by underscores
-                      e.target.src = `/${workshop.title.toLowerCase().replace(/\s+/g, '_')}.png`;
+                      // Fallback to default image
+                      e.target.src = '/default-workshop.png';
                     }}
                   />
                   {!workshop.isFree && (
@@ -178,19 +209,25 @@ const WorkshopTutorials = () => {
                         src={workshop.instructor.avatar || '/default-avatar.png'}
                         alt={workshop.instructor.name}
                         className="w-8 h-8 rounded-full mr-2"
+                        onError={(e) => {
+                          e.target.src = '/default-avatar.png';
+                        }}
                       />
                       <span className="text-sm text-gray-700">{workshop.instructor.name}</span>
                     </div>
                     <Button
                       onClick={() => {
-                        if (workshop.isFree && workshop.videoUrl) {
-                          // Redirect to YouTube link for free workshops
+                        if (workshop.videoUrl) {
+                          // If workshop has a video URL, redirect directly to YouTube/video
                           window.location.href = workshop.videoUrl;
-                        } else if (hasActiveSubscription || workshop.isFree) {
-                          // For subscribed users or free workshops, navigate to watch page
+                        } else if (workshop.isFree) {
+                          // For free workshops without video URL, navigate to watch page
+                          nav(`/workshops/${workshop._id}/watch`);
+                        } else if (hasActiveSubscription) {
+                          // For subscribed users, navigate to watch page
                           nav(`/workshops/${workshop._id}/watch`);
                         } else {
-                          // Navigate to workshop detail page for premium workshops (non-subscribed users)
+                          // For non-subscribed users, navigate to workshop detail page for payment
                           nav(`/workshops/${workshop._id}`);
                         }
                       }}

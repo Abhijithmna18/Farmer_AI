@@ -15,6 +15,10 @@ const navItems = [
   { label: 'Events', to: '/admin/dashboard/events', icon: '📅' },
   { label: 'Growth Calendar', to: '/admin/growth-calendar', icon: '🌱' },
   { label: 'Warehouse', to: '/admin/warehouse', icon: '🏪' },
+  { label: 'Gallery', to: '/admin/gallery', icon: '🖼️' },
+  { label: 'Blogs', to: '/admin/blogs', icon: '📝' },
+  { label: 'Home Content', to: '/admin/home-content', icon: '🏠' },
+  { label: 'Workshop Tutorials', to: '/admin/workshop-tutorials', icon: '🎓' },
   { label: 'Contact Messages', to: '/admin/dashboard/contacts', icon: '✉️' },
   { label: 'Settings', to: '/admin/dashboard/settings', icon: '⚙️' },
 ];

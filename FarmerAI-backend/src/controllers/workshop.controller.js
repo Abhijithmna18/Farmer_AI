@@ -2,6 +2,8 @@
 const Workshop = require('../models/Workshop');
 const WorkshopSubscription = require('../models/WorkshopSubscription');
 const { createOrder } = require('../config/razorpay');
+const { deleteFile, getFileUrl } = require('../middlewares/imageUpload.middleware');
+const path = require('path');
 const logger = require('../utils/logger');
 
 // Get all workshops
@@ -30,9 +32,25 @@ const getAllWorkshops = async (req, res) => {
       
     const total = await Workshop.countDocuments(query);
     
+    // Transform workshops to include isFree field and YouTube data for frontend compatibility
+    const transformedWorkshops = workshops.map(workshop => {
+      const workshopObj = workshop.toObject();
+      const youtubeVideoId = workshop.getYouTubeVideoId();
+      const youtubeThumbnail = workshop.getYouTubeThumbnail();
+      
+      return {
+        ...workshopObj,
+        isFree: !workshop.isPremium,
+        youtubeVideoId,
+        youtubeThumbnail,
+        // Use YouTube thumbnail as fallback if no custom thumbnail
+        thumbnail: workshopObj.thumbnail || youtubeThumbnail || '/default-workshop.png'
+      };
+    });
+    
     res.json({
       success: true,
-      data: workshops,
+      data: transformedWorkshops,
       pagination: {
         current: parseInt(page),
         pages: Math.ceil(total / limit),
@@ -67,9 +85,23 @@ const getWorkshopById = async (req, res) => {
     workshop.views += 1;
     await workshop.save();
     
+    // Transform workshop to include isFree field and YouTube data for frontend compatibility
+    const workshopObj = workshop.toObject();
+    const youtubeVideoId = workshop.getYouTubeVideoId();
+    const youtubeThumbnail = workshop.getYouTubeThumbnail();
+    
+    const transformedWorkshop = {
+      ...workshopObj,
+      isFree: !workshop.isPremium,
+      youtubeVideoId,
+      youtubeThumbnail,
+      // Use YouTube thumbnail as fallback if no custom thumbnail
+      thumbnail: workshopObj.thumbnail || youtubeThumbnail || '/default-workshop.png'
+    };
+    
     res.json({
       success: true,
-      data: workshop
+      data: transformedWorkshop
     });
   } catch (error) {
     logger.error('Error fetching workshop:', error);
@@ -347,7 +379,7 @@ const checkWorkshopAccess = async (req, res) => {
     }
     
     // Free workshops are accessible to everyone
-    if (workshop.isFree) {
+    if (!workshop.isPremium) {
       return res.json({
         success: true,
         data: {
@@ -385,9 +417,195 @@ const checkWorkshopAccess = async (req, res) => {
   }
 };
 
+// Create workshop (Admin only)
+const createWorkshop = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      videoUrl,
+      duration,
+      category,
+      level,
+      isPremium,
+      price,
+      tags,
+      instructorName,
+      instructorBio,
+      instructorAvatar,
+      learningOutcomes,
+      prerequisites,
+      materials
+    } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thumbnail image is required'
+      });
+    }
+
+    const thumbnailUrl = getFileUrl(req, req.file.filename, 'workshops');
+
+    const workshop = new Workshop({
+      title,
+      description,
+      thumbnail: thumbnailUrl,
+      videoUrl,
+      duration: parseInt(duration),
+      category,
+      level,
+      isPremium: isPremium === 'true',
+      price: isPremium === 'true' ? parseInt(price) : 0,
+      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+      instructor: {
+        name: instructorName,
+        bio: instructorBio,
+        avatar: instructorAvatar
+      },
+      learningOutcomes: learningOutcomes ? learningOutcomes.split(',').map(outcome => outcome.trim()) : [],
+      prerequisites: prerequisites ? prerequisites.split(',').map(prereq => prereq.trim()) : [],
+      materials: materials ? JSON.parse(materials) : []
+    });
+
+    await workshop.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Workshop created successfully',
+      data: workshop
+    });
+  } catch (error) {
+    logger.error('Error creating workshop:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create workshop',
+      error: error.message
+    });
+  }
+};
+
+// Update workshop (Admin only)
+const updateWorkshop = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      videoUrl,
+      duration,
+      category,
+      level,
+      isPremium,
+      price,
+      tags,
+      instructorName,
+      instructorBio,
+      instructorAvatar,
+      learningOutcomes,
+      prerequisites,
+      materials,
+      isActive
+    } = req.body;
+
+    const workshop = await Workshop.findById(req.params.id);
+    if (!workshop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop not found'
+      });
+    }
+
+    // Handle thumbnail update
+    let thumbnail = workshop.thumbnail;
+    if (req.file) {
+      // Delete old thumbnail
+      const oldThumbnailPath = path.join(__dirname, '../../uploads/workshops', path.basename(workshop.thumbnail));
+      deleteFile(oldThumbnailPath);
+      
+      // Set new thumbnail
+      thumbnail = getFileUrl(req, req.file.filename, 'workshops');
+    }
+
+    const updateData = {
+      title: title || workshop.title,
+      description: description || workshop.description,
+      thumbnail,
+      videoUrl: videoUrl || workshop.videoUrl,
+      duration: duration ? parseInt(duration) : workshop.duration,
+      category: category || workshop.category,
+      level: level || workshop.level,
+      isPremium: isPremium !== undefined ? isPremium === 'true' : workshop.isPremium,
+      price: isPremium === 'true' ? parseInt(price) : 0,
+      tags: tags ? tags.split(',').map(tag => tag.trim()) : workshop.tags,
+      instructor: {
+        name: instructorName || workshop.instructor.name,
+        bio: instructorBio || workshop.instructor.bio,
+        avatar: instructorAvatar || workshop.instructor.avatar
+      },
+      learningOutcomes: learningOutcomes ? learningOutcomes.split(',').map(outcome => outcome.trim()) : workshop.learningOutcomes,
+      prerequisites: prerequisites ? prerequisites.split(',').map(prereq => prereq.trim()) : workshop.prerequisites,
+      materials: materials ? JSON.parse(materials) : workshop.materials,
+      isActive: isActive !== undefined ? isActive === 'true' : workshop.isActive
+    };
+
+    const updatedWorkshop = await Workshop.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Workshop updated successfully',
+      data: updatedWorkshop
+    });
+  } catch (error) {
+    logger.error('Error updating workshop:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update workshop',
+      error: error.message
+    });
+  }
+};
+
+// Delete workshop (Admin only)
+const deleteWorkshop = async (req, res) => {
+  try {
+    const workshop = await Workshop.findById(req.params.id);
+    if (!workshop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop not found'
+      });
+    }
+
+    // Delete associated thumbnail file
+    const thumbnailPath = path.join(__dirname, '../../uploads/workshops', path.basename(workshop.thumbnail));
+    deleteFile(thumbnailPath);
+
+    await Workshop.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Workshop deleted successfully'
+    });
+  } catch (error) {
+    logger.error('Error deleting workshop:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete workshop',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllWorkshops,
   getWorkshopById,
+  createWorkshop,
+  updateWorkshop,
+  deleteWorkshop,
   createWorkshopSubscriptionOrder,
   verifyWorkshopSubscriptionPayment,
   getUserSubscriptions,

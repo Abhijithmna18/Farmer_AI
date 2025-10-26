@@ -1,19 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workshopService } from '../services/workshopService';
+import { generateEmbedUrl, getVideoThumbnailUrl } from '../utils/youtubeUtils';
+import useAuth from '../hooks/useAuth';
 
 const WorkshopVideo = () => {
   const { id } = useParams();
   const nav = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [workshop, setWorkshop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
 
   useEffect(() => {
-    fetchWorkshop();
-    checkAccess();
-  }, [id]);
+    // Check authentication first
+    if (!authLoading) {
+      if (!user) {
+        // User not authenticated, redirect to login
+        nav('/login');
+        return;
+      }
+      
+      // User is authenticated, proceed with workshop access check
+      fetchWorkshop();
+      checkAccess();
+    }
+  }, [user, authLoading, id]);
 
   const fetchWorkshop = async () => {
     try {
@@ -43,7 +56,8 @@ const WorkshopVideo = () => {
     }
   };
 
-  if (loading) {
+  // Show loading while checking authentication or workshop data
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -70,37 +84,14 @@ const WorkshopVideo = () => {
     );
   }
 
-  // Extract YouTube video ID if it's a YouTube URL
-  // Function to detect video platform and generate appropriate embed URL
-  const getVideoEmbedUrl = (url) => {
-    // YouTube URL patterns
-    const youtubeRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const youtubeMatch = url.match(youtubeRegExp);
-    const youtubeId = (youtubeMatch && youtubeMatch[2].length === 11) ? youtubeMatch[2] : null;
-    
-    if (youtubeId) {
-      return `https://www.youtube.com/embed/${youtubeId}?autoplay=1`;
-    }
-    
-    // Vimeo URL patterns
-    const vimeoRegExp = /(?:https?:\/\/)?(?:www\.)?vimeo.com\/([0-9]+)/;
-    const vimeoMatch = url.match(vimeoRegExp);
-    const vimeoId = vimeoMatch ? vimeoMatch[1] : null;
-    
-    if (vimeoId) {
-      return `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
-    }
-    
-    // For direct video URLs, return as is
-    if (url.match(/\.(mp4|webm|ogg)$/i)) {
-      return url;
-    }
-    
-    // For other URLs, assume it's embeddable
-    return url;
-  };
-
-  const embedUrl = getVideoEmbedUrl(workshop.videoUrl);
+  // Generate embed URL using YouTube utilities
+  const embedUrl = generateEmbedUrl(workshop.videoUrl, {
+    autoplay: 1,
+    rel: 0,
+    modestbranding: 1,
+    showinfo: 0,
+    controls: 1
+  });
 
   return (
     <div className="min-h-screen bg-gray-900">

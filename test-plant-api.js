@@ -7,7 +7,7 @@ const path = require('path');
 // Set environment variable for testing
 process.env.GEMINI_API_KEY = 'AIzaSyD79APiY2vm_MKwuScXLbv2lopLpPLuyiE';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5002/api';
 
 async function testPlantIdentification() {
   console.log('🧪 Testing Plant Identification API...\n');
@@ -16,11 +16,13 @@ async function testPlantIdentification() {
     // Test 1: Check if server is running
     console.log('1. Testing server connectivity...');
     try {
-      const healthResponse = await axios.get(`${API_BASE_URL}/health`);
+      const healthResponse = await axios.get(`${API_BASE_URL}/`, { timeout: 5000 });
       console.log('✅ Server is running');
+      console.log('Server response:', healthResponse.data);
     } catch (error) {
-      console.log('❌ Server is not running. Please start the server first.');
-      console.log('Run: cd FarmerAI-backend && npm start');
+      console.log('❌ Server is not running or not responding correctly.');
+      console.log('Error:', error.message);
+      console.log('Please make sure the backend server is running on port 5002.');
       return;
     }
 
@@ -64,6 +66,9 @@ async function testPlantIdentification() {
       console.log('Rose details:', JSON.stringify(detailsResponse.data, null, 2));
     } catch (error) {
       console.log('❌ Plant details test failed:', error.response?.status, error.message);
+      if (error.response?.data) {
+        console.log('Error details:', JSON.stringify(error.response.data, null, 2));
+      }
     }
 
     // Test 4: Test fetch plants endpoint
@@ -74,6 +79,9 @@ async function testPlantIdentification() {
       console.log(`Found ${plantsResponse.data.plants?.length || 0} saved plants`);
     } catch (error) {
       console.log('❌ Fetch plants test failed:', error.response?.status, error.message);
+      if (error.response?.data) {
+        console.log('Error details:', JSON.stringify(error.response.data, null, 2));
+      }
     }
 
     // Test 5: Test with a sample image (if available)
@@ -112,7 +120,7 @@ async function testPlantIdentification() {
       } catch (error) {
         console.log('❌ Plant identification with image failed:', error.response?.status, error.message);
         if (error.response?.data) {
-          console.log('Error details:', error.response.data);
+          console.log('Error details:', JSON.stringify(error.response.data, null, 2));
         }
       }
     } else {
@@ -123,9 +131,11 @@ async function testPlantIdentification() {
 
   } catch (error) {
     console.error('Test failed with error:', error.message);
+    if (error.response?.data) {
+      console.log('Error details:', JSON.stringify(error.response.data, null, 2));
+    }
   }
 }
 
 // Run the test
 testPlantIdentification();
-

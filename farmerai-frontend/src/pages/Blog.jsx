@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaLeaf, FaTractor, FaChartLine, FaCloudSun } from 'react-icons/fa';
 import HomeButton from '../components/HomeButton';
+import apiClient from '../services/apiClient';
 
 const Blog = () => {
-  const sections = [
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Fallback static data
+  const fallbackSections = [
     {
       title: 'AI-Powered Crop Recommendations',
       content: 'Artificial Intelligence is revolutionizing crop management by providing farmers with data-driven recommendations for what to plant, when to plant, and how to optimize yields. By analyzing historical weather patterns, soil composition, and market demand, AI algorithms can suggest the most profitable and sustainable crop choices. This technology helps farmers mitigate risks associated with climate change and market volatility. For instance, an AI system might recommend planting a drought-resistant crop variety in a region with a high probability of low rainfall. Furthermore, these systems can provide personalized advice based on the specific conditions of a farm, taking into account factors like soil pH, nutrient levels, and local pest prevalence. This level of precision enables farmers to make more informed decisions, leading to increased productivity and profitability while minimizing environmental impact. The adoption of AI in crop selection is a significant step towards a more resilient and efficient agricultural sector, empowering farmers to thrive in an ever-changing world.',
@@ -13,26 +19,56 @@ const Blog = () => {
     },
     {
       title: 'Soil Health Monitoring via Phone Camera',
-      content: 'The ability to assess soil health quickly and accurately is crucial for sustainable farming. Emerging technologies now allow farmers to monitor soil health using just their smartphone cameras. By taking a picture of a soil sample, an AI-powered application can analyze its color, texture, and structure to provide an instant assessment of its condition. This analysis can reveal vital information about organic matter content, moisture levels, and potential nutrient deficiencies. This approach is not only cost-effective but also highly accessible, as it eliminates the need for expensive lab equipment and time-consuming tests. Farmers can get real-time feedback on their soil management practices, such as the impact of cover cropping or no-till farming. This immediate feedback loop allows for rapid adjustments and continuous improvement of soil health. By putting the power of soil analysis in the hands of every farmer, this technology democratizes access to critical agricultural data and promotes more sustainable land management practices globally.',
+      content: 'Modern smartphones equipped with advanced cameras and AI capabilities are transforming soil health assessment. Farmers can now capture images of their soil and receive instant analysis regarding nutrient levels, pH balance, and overall soil health. This innovative approach eliminates the need for expensive laboratory tests and provides immediate feedback. The technology works by analyzing soil color, texture, and composition patterns through computer vision algorithms. By comparing captured images with extensive databases of soil samples, the system can identify potential issues such as nutrient deficiencies, pH imbalances, or signs of soil degradation. This real-time monitoring enables farmers to make timely interventions, applying the right fertilizers or soil amendments precisely when needed. The convenience and accessibility of this technology make soil health monitoring more democratic, allowing small-scale farmers to access professional-grade analysis tools. As this technology continues to evolve, it promises to revolutionize how farmers understand and manage their most valuable asset - their soil.',
       image: '/blog2.png',
       src: '/public/blog2.png',
-      icon: <FaTractor className="text-yellow-500" />,
+      icon: <FaTractor className="text-blue-500" />,
     },
     {
-      title: 'Market Price Forecasting for Farmers',
-      content: 'One of the biggest challenges for smallholder farmers is navigating the unpredictable nature of market prices. AI-powered forecasting tools are changing this by providing farmers with accurate predictions of future commodity prices. These tools analyze a vast array of data, including historical price trends, weather forecasts, global supply and demand, and even social media sentiment. By understanding these market dynamics, farmers can make strategic decisions about when to sell their produce to maximize their income. For example, if a price surge is predicted for a particular crop, a farmer might decide to store their harvest for a few weeks to take advantage of the higher prices. This can make a significant difference in their profitability and economic stability. These forecasting tools also help farmers plan their planting seasons more effectively, aligning their production with anticipated market demand. By reducing uncertainty and empowering farmers with market intelligence, AI is helping to create a more equitable and prosperous agricultural economy.',
+      title: 'Market Trends and Price Prediction',
+      content: 'Understanding market dynamics is crucial for farmers to maximize their profits and make informed decisions about crop planning and sales timing. Advanced analytics and machine learning algorithms are now being used to predict market trends, analyze price fluctuations, and identify optimal selling opportunities. These systems process vast amounts of data including historical prices, weather patterns, global supply and demand, economic indicators, and even social media sentiment. By identifying patterns and correlations in this data, farmers can anticipate market movements and adjust their strategies accordingly. For example, if the system predicts a price increase for a particular crop in the coming months, farmers might choose to delay their harvest or storage decisions. Conversely, if a price drop is anticipated, they might accelerate their sales or consider alternative crops. This data-driven approach to market analysis helps farmers reduce uncertainty and make more profitable decisions. The integration of real-time market data with farm management systems creates a comprehensive platform for agricultural decision-making.',
       image: '/blog3.png',
       src: '/public/blog3.png',
-      icon: <FaChartLine className="text-blue-500" />,
+      icon: <FaChartLine className="text-purple-500" />,
     },
     {
-      title: 'Building Sustainable Agriculture with Technology',
-      content: 'Technology is at the heart of the movement towards a more sustainable agricultural system. From precision irrigation systems that conserve water to drones that monitor crop health and apply treatments with pinpoint accuracy, innovation is driving efficiency and reducing the environmental footprint of farming. These technologies allow farmers to produce more food with fewer resources, which is essential for feeding a growing global population while protecting our planet. For example, sensor-based irrigation systems can reduce water usage by up to 50% by delivering water directly to the plant roots when it is most needed. Similarly, drones equipped with multispectral cameras can identify areas of a field that are under stress from pests or disease, allowing for targeted application of pesticides instead of blanket spraying. This not only saves money but also minimizes chemical runoff into waterways. By embracing these technological advancements, we can build a more resilient, productive, and sustainable food system for generations to come.',
+      title: 'Climate-Resilient Farming Techniques',
+      content: 'As climate change continues to impact agricultural systems worldwide, farmers are adopting innovative techniques to build resilience and ensure sustainable food production. Climate-resilient farming involves implementing practices that help agricultural systems adapt to changing weather patterns, extreme events, and environmental challenges. These techniques include drought-resistant crop varieties, water-efficient irrigation systems, soil conservation methods, and integrated pest management strategies. Precision agriculture technologies play a crucial role in climate adaptation, enabling farmers to optimize resource use and minimize environmental impact. For instance, sensor-based irrigation systems can adjust water delivery based on real-time soil moisture and weather data, ensuring optimal water use even during drought conditions. Similarly, climate-smart crop rotation and cover cropping techniques help maintain soil health and reduce vulnerability to extreme weather events. The adoption of renewable energy sources, such as solar-powered irrigation systems, further enhances the sustainability and resilience of farming operations. By combining traditional knowledge with modern technology, farmers can develop robust systems that can withstand climate challenges while maintaining productivity and environmental stewardship.',
       image: '/blog4.png',
       src: '/public/blog4.png',
       icon: <FaCloudSun className="text-orange-500" />,
     },
   ];
+
+  useEffect(() => {
+    fetchBlogs();
+  }, []);
+
+  const fetchBlogs = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/blogs?isPublished=true&limit=10');
+      const blogData = response.data?.data || response.data || [];
+      setBlogs(blogData);
+    } catch (err) {
+      console.error('Error fetching blogs:', err);
+      setError('Failed to load blog posts. Showing fallback content.');
+      setBlogs(fallbackSections);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-50 text-gray-800 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading blog posts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 text-gray-800">
@@ -45,23 +81,54 @@ const Blog = () => {
             <p className="text-lg md:text-xl">
               Discover how Artificial Intelligence and digital platforms are empowering farmers with data-driven insights for a more sustainable and profitable future.
             </p>
+            {error && (
+              <div className="mt-4 text-yellow-200 text-sm">
+                {error}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Blog Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
-        {sections.map((section, index) => (
-          <section key={index} className={`flex flex-col md:flex-row items-center gap-12 ${index % 2 !== 0 ? 'md:flex-row-reverse' : ''}`}>
+        {blogs.map((section, index) => (
+          <section key={section._id || index} className={`flex flex-col md:flex-row items-center gap-12 ${index % 2 !== 0 ? 'md:flex-row-reverse' : ''}`}>
             <div className="md:w-1/2">
-              <img src={section.image} alt={section.title} className="rounded-xl shadow-lg w-full h-auto object-cover" />
+              <img 
+                src={section.coverImage?.url || section.image} 
+                alt={section.title} 
+                className="rounded-xl shadow-lg w-full h-auto object-cover" 
+              />
             </div>
             <div className="md:w-1/2 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="text-4xl">{section.icon}</div>
+                <div className="text-4xl">{section.icon || <FaLeaf className="text-green-500" />}</div>
                 <h2 className="text-3xl font-bold">{section.title}</h2>
               </div>
               <p className="text-lg leading-relaxed">{section.content}</p>
+              {section.excerpt && section.excerpt !== section.content && (
+                <p className="text-gray-600 italic">{section.excerpt}</p>
+              )}
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                {section.category && (
+                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    {section.category}
+                  </span>
+                )}
+                {section.tags && section.tags.length > 0 && (
+                  <div className="flex gap-1">
+                    {section.tags.slice(0, 3).map((tag, tagIndex) => (
+                      <span key={tagIndex} className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {section.publishedAt && (
+                  <span>{new Date(section.publishedAt).toLocaleDateString()}</span>
+                )}
+              </div>
             </div>
           </section>
         ))}

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workshopService } from '../services/workshopService';
 import Button from '../components/Button';
+import useAuth from '../hooks/useAuth';
 
 const WorkshopDetail = () => {
   const { id } = useParams();
   const nav = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [workshop, setWorkshop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,9 +15,19 @@ const WorkshopDetail = () => {
   const [accessLoading, setAccessLoading] = useState(true);
 
   useEffect(() => {
-    fetchWorkshop();
-    checkAccess();
-  }, [id]);
+    // Check authentication first
+    if (!authLoading) {
+      if (!user) {
+        // User not authenticated, redirect to login
+        nav('/login');
+        return;
+      }
+      
+      // User is authenticated, proceed with workshop data and access check
+      fetchWorkshop();
+      checkAccess();
+    }
+  }, [user, authLoading, id]);
 
   const fetchWorkshop = async () => {
     try {
@@ -122,7 +134,8 @@ const WorkshopDetail = () => {
     }
   };
 
-  if (loading) {
+  // Show loading while checking authentication or workshop data
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -177,12 +190,12 @@ const WorkshopDetail = () => {
           {/* Workshop header */}
           <div className="relative">
             <img
-              src={workshop.thumbnail || `/${workshop.title}.png`}
+              src={workshop.thumbnail || workshop.youtubeThumbnail || '/default-workshop.png'}
               alt={workshop.title}
               className="w-full h-96 object-cover"
               onError={(e) => {
-                // Fallback to lowercase with spaces replaced by underscores
-                e.target.src = `/${workshop.title.toLowerCase().replace(/\s+/g, '_')}.png`;
+                // Fallback to default image
+                e.target.src = '/default-workshop.png';
               }}
             />
             {!workshop.isFree && (
@@ -214,6 +227,9 @@ const WorkshopDetail = () => {
                 src={workshop.instructor.avatar || '/default-avatar.png'}
                 alt={workshop.instructor.name}
                 className="w-16 h-16 rounded-full mr-4"
+                onError={(e) => {
+                  e.target.src = '/default-avatar.png';
+                }}
               />
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{workshop.instructor.name}</h3>
@@ -294,11 +310,11 @@ const WorkshopDetail = () => {
               ) : hasAccess ? (
                 <Button
                   onClick={() => {
-                    if (workshop.isFree && workshop.videoUrl) {
-                      // Redirect to YouTube link for free workshops
+                    if (workshop.videoUrl) {
+                      // If workshop has a video URL, redirect directly to YouTube/video
                       window.location.href = workshop.videoUrl;
                     } else {
-                      // Navigate to workshop watch page for premium workshops
+                      // Navigate to workshop watch page for workshops without video URL
                       nav(`/workshops/${id}/watch`);
                     }
                   }}
@@ -309,11 +325,11 @@ const WorkshopDetail = () => {
               ) : (
                 <Button
                   onClick={() => {
-                    if (workshop.isFree && workshop.videoUrl) {
-                      // Redirect to YouTube link for free workshops
+                    if (workshop.videoUrl) {
+                      // If workshop has a video URL, redirect directly to YouTube/video
                       window.location.href = workshop.videoUrl;
                     } else {
-                      // Handle enrollment for premium workshops
+                      // Handle enrollment for workshops without video URL
                       handleEnroll();
                     }
                   }}

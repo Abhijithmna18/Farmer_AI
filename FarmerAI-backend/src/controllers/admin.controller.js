@@ -1187,7 +1187,7 @@ exports.getPaymentAnalytics = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching payment analytics:', error);
-    res.status(500).json({ message: 'Failed to fetch payment analytics.' });
+    res.status(500).json({ success: false, message: 'Failed to fetch payment analytics.' });
   }
 };
 
@@ -1319,19 +1319,22 @@ exports.getOverviewStats = async (req, res) => {
     const totalWarehouses = await Warehouse.countDocuments();
     const totalBookings = await Booking.countDocuments();
     const activeBookings = await Booking.countDocuments({ 
-      status: { $in: ['approved', 'awaiting-approval', 'pending'] } 
+      status: { $in: ['approved', 'awaiting-approval', 'pending', 'paid'] } 
     });
     const completedBookings = await Booking.countDocuments({ status: 'completed' });
+    const cancelledBookings = await Booking.countDocuments({ status: 'cancelled' });
+    const rejectedBookings = await Booking.countDocuments({ status: 'rejected' });
+    const pendingBookings = await Booking.countDocuments({ status: 'pending' });
+    const paidBookings = await Booking.countDocuments({ status: 'paid' });
+    const approvedBookings = await Booking.countDocuments({ status: 'approved' });
+    const awaitingApprovalBookings = await Booking.countDocuments({ status: 'awaiting-approval' });
     const pendingApprovals = await Warehouse.countDocuments({ 
       'verification.status': 'pending' 
     });
 
-    // Revenue
-    const revenueResult = await Payment.aggregate([
-      { $match: { status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$amount.total' } } }
-    ]);
-    const totalRevenue = revenueResult[0]?.total || 0;
+    // Revenue - Use Payment model for accurate revenue calculation
+    const paymentStats = await Payment.getStats();
+    const totalRevenue = paymentStats.totalAmount || 0;
 
     // Growth calculations (vs last month)
     const lastMonthUsers = await User.countDocuments({ createdAt: { $lt: lastMonth } });
@@ -1360,6 +1363,12 @@ exports.getOverviewStats = async (req, res) => {
         totalBookings,
         activeBookings,
         completedBookings,
+        cancelledBookings,
+        rejectedBookings,
+        pendingBookings,
+        paidBookings,
+        approvedBookings,
+        awaitingApprovalBookings,
         totalRevenue,
         pendingApprovals,
         lowStockWarehouses,

@@ -260,6 +260,12 @@ BookingSchema.statics.getStats = async function(filters = {}) {
         },
         cancelledBookings: {
           $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
+        },
+        awaitingApprovalBookings: {
+          $sum: { $cond: [{ $eq: ['$status', 'awaiting-approval'] }, 1, 0] }
+        },
+        rejectedBookings: {
+          $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
         }
       }
     }
@@ -273,7 +279,9 @@ BookingSchema.statics.getStats = async function(filters = {}) {
     paidBookings: 0,
     approvedBookings: 0,
     completedBookings: 0,
-    cancelledBookings: 0
+    cancelledBookings: 0,
+    awaitingApprovalBookings: 0,
+    rejectedBookings: 0
   };
 };
 

@@ -16,6 +16,11 @@ import CommunityRequests from '../components/admin/CommunityRequests';
 import AdminFeedback from './Admin/AdminFeedback';
 import AdminWarehouseDashboard from './AdminWarehouseDashboard';
 import AdminWarehouseTest from './AdminWarehouseTest';
+import AdminGallery from './Admin/AdminGallery';
+import AdminBlogs from './Admin/AdminBlogs';
+import AdminHomeContent from './Admin/AdminHomeContent';
+import AdminWorkshopTutorials from './Admin/AdminWorkshopTutorials';
+import WorkshopManagement from './WorkshopManagement';
 
 function RequireAdmin({ children }) {
   const { user, loading } = useAuth();
@@ -44,6 +49,11 @@ export default function AdminRouter(){
         <Route path="feedback" element={<AdminFeedback />} />
         <Route path="warehouse" element={<AdminWarehouseDashboard />} />
         <Route path="pending-farmers" element={<PendingFarmers />} />
+        <Route path="gallery" element={<AdminGallery />} />
+        <Route path="blogs" element={<AdminBlogs />} />
+        <Route path="home-content" element={<AdminHomeContent />} />
+        <Route path="workshop-tutorials" element={<AdminWorkshopTutorials />} />
+        <Route path="workshops" element={<WorkshopManagement />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" />} />
       </Route>
     </Routes>

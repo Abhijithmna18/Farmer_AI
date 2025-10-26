@@ -551,83 +551,143 @@ const AdminWarehouseDashboard = ({ initialTab = 'overview' }) => {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Warehouse Management</h1>
-          <p className="text-gray-600">Admin dashboard for warehouse and booking management</p>
+      <div className="container mx-auto px-6 py-8">
+        {/* Professional Header */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-3 tracking-tight">Warehouse Management</h1>
+              <p className="text-lg text-gray-600 font-medium">Comprehensive admin dashboard for warehouse and booking management</p>
+            </div>
+            <div className="hidden lg:flex items-center space-x-4">
+              <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <span className="text-sm font-semibold text-green-700">Live Dashboard</span>
+              </div>
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
+          </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CalendarIcon className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalBookings}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <BuildingOfficeIcon className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Warehouses</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalWarehouses}</p>
+        {/* Professional KPI Cards Section */}
+        <div className="mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            {/* Total Bookings Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-blue-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-50 to-blue-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-blue-500 rounded-xl shadow-sm">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Bookings</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
+                  <p className="text-xs text-gray-400">All time bookings</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <CurrencyRupeeIcon className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Payments</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalPayments}</p>
+            {/* Total Warehouses Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-green-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-50 to-green-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-green-500 rounded-xl shadow-sm">
+                    <BuildingOfficeIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Warehouses</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalWarehouses}</p>
+                  <p className="text-xs text-gray-400">Registered facilities</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <CurrencyRupeeIcon className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.totalRevenue}</p>
+            {/* Total Payments Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-purple-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-50 to-purple-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-purple-500 rounded-xl shadow-sm">
+                    <CurrencyRupeeIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Payments</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalPayments}</p>
+                  <p className="text-xs text-gray-400">Transaction count</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <ClockIcon className="h-6 w-6 text-orange-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Pending Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingBookings}</p>
+            {/* Total Revenue Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-amber-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-50 to-amber-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-amber-500 rounded-xl shadow-sm">
+                    <CurrencyRupeeIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Revenue</p>
+                  <p className="text-3xl font-bold text-gray-900">₹{stats.totalRevenue?.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">Revenue generated</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircleIcon className="h-6 w-6 text-green-600" />
+            {/* Pending Bookings Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-orange-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-50 to-orange-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-orange-500 rounded-xl shadow-sm">
+                    <ClockIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Pending Bookings</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.pendingBookings}</p>
+                  <p className="text-xs text-gray-400">Awaiting approval</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Active Warehouses</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeWarehouses}</p>
+            </div>
+
+            {/* Active Warehouses Card */}
+            <div className="group relative bg-white rounded-2xl shadow-sm border border-gray-200/60 p-6 hover:shadow-lg hover:border-emerald-200 transition-all duration-300 overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-bl-3xl opacity-60"></div>
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-emerald-500 rounded-xl shadow-sm">
+                    <CheckCircleIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Active Warehouses</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.activeWarehouses}</p>
+                  <p className="text-xs text-gray-400">Currently operational</p>
+                </div>
               </div>
             </div>
           </div>

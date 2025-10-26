@@ -3,6 +3,9 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import Toast from '../components/Toast';
 import { uploadPlantImage, classifyPlant, fetchPlants, updatePlant, deletePlant, createPlant, fetchPlantDetailsByName } from '../services/plantService';
 
+// Get the API base URL from environment variables
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5002/api";
+
 // Enhanced Plant Info Card Component
 function PlantInfoCard({ plant, onEdit }) {
   if (!plant) return null;
@@ -13,9 +16,14 @@ function PlantInfoCard({ plant, onEdit }) {
         {plant.imageUrl && (
           <div className="flex-shrink-0">
             <img
-              src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}${plant.imageUrl}`}
+              src={`${API_BASE_URL.replace('/api', '')}${plant.imageUrl}`}
               alt={plant.name}
               className="w-48 h-48 object-cover rounded-lg shadow-md"
+              onError={(e) => {
+                console.error('Image failed to load:', e.target.src);
+                // Set a fallback image or hide the image container
+                e.target.style.display = 'none';
+              }}
             />
           </div>
         )}
@@ -385,9 +393,10 @@ export default function PlantExplorer() {
       setToast({ message: 'Classification completed successfully!', type: 'success' });
     } catch (e) {
       console.error('Plant classification error:', e);
-      const errorMessage = e?.response?.data?.message || e.message || 'Classification failed';
+      const errorData = e?.response?.data;
+      const errorMessage = errorData?.message || e.message || 'Classification failed';
       setError(errorMessage);
-      setErrorSuggestions([
+      setErrorSuggestions(errorData?.suggestions || [
         'Try uploading a clearer image',
         'Ensure the image contains a plant',
         'Check your internet connection'
@@ -731,9 +740,14 @@ export default function PlantExplorer() {
                     <td className="px-4 py-3">
                       {p.imageUrl ? (
                         <img
-                          src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}${p.imageUrl}`}
+                          src={`${API_BASE_URL.replace('/api', '')}${p.imageUrl}`}
                           alt={p.name}
                           className="w-16 h-16 object-cover rounded-lg"
+                          onError={(e) => {
+                            console.error('Table image failed to load:', e.target.src);
+                            // Set a fallback image or hide the image container
+                            e.target.style.display = 'none';
+                          }}
                         />
                       ) : (
                         <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg flex items-center justify-center">

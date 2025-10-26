@@ -97,6 +97,81 @@ export const workshopService = {
       console.error('Error fetching user subscriptions:', error);
       throw error;
     }
+  },
+
+  // Admin CRUD operations
+  createWorkshop: async (workshopData) => {
+    try {
+      const formData = new FormData();
+      
+      // Append all text fields
+      Object.keys(workshopData).forEach(key => {
+        if (key !== 'thumbnail' && workshopData[key] !== null && workshopData[key] !== undefined) {
+          if (Array.isArray(workshopData[key])) {
+            formData.append(key, workshopData[key].join(','));
+          } else {
+            formData.append(key, workshopData[key]);
+          }
+        }
+      });
+      
+      // Append thumbnail file if provided
+      if (workshopData.thumbnail) {
+        formData.append('thumbnail', workshopData.thumbnail);
+      }
+      
+      const { data } = await apiClient.post('/workshops', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return data;
+    } catch (error) {
+      console.error('Error creating workshop:', error);
+      throw error;
+    }
+  },
+
+  updateWorkshop: async (id, workshopData) => {
+    try {
+      const formData = new FormData();
+      
+      // Append all text fields
+      Object.keys(workshopData).forEach(key => {
+        if (key !== 'thumbnail' && workshopData[key] !== null && workshopData[key] !== undefined) {
+          if (Array.isArray(workshopData[key])) {
+            formData.append(key, workshopData[key].join(','));
+          } else {
+            formData.append(key, workshopData[key]);
+          }
+        }
+      });
+      
+      // Append thumbnail file if provided
+      if (workshopData.thumbnail) {
+        formData.append('thumbnail', workshopData.thumbnail);
+      }
+      
+      const { data } = await apiClient.put(`/workshops/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return data;
+    } catch (error) {
+      console.error('Error updating workshop:', error);
+      throw error;
+    }
+  },
+
+  deleteWorkshop: async (id) => {
+    try {
+      const { data } = await apiClient.delete(`/workshops/${id}`);
+      return data;
+    } catch (error) {
+      console.error('Error deleting workshop:', error);
+      throw error;
+    }
   }
 };
 

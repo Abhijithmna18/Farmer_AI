@@ -16,6 +16,9 @@ const WorkshopSchema = new mongoose.Schema(
       type: String, // URL to thumbnail image
       required: true
     },
+    thumbnailFilename: {
+      type: String // Store filename for deletion
+    },
     videoUrl: {
       type: String, // URL to video (YouTube, Vimeo, etc.)
       required: true
@@ -116,5 +119,28 @@ WorkshopSchema.index({ createdAt: -1 });
 WorkshopSchema.virtual('isFree').get(function() {
   return !this.isPremium || this.price <= 0;
 });
+
+// Instance methods for YouTube integration
+WorkshopSchema.methods.getYouTubeVideoId = function() {
+  if (!this.videoUrl) return null;
+  
+  const youtubeRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = this.videoUrl.match(youtubeRegExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
+WorkshopSchema.methods.getYouTubeThumbnail = function() {
+  const videoId = this.getYouTubeVideoId();
+  if (!videoId) return null;
+  
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+};
+
+WorkshopSchema.methods.getYouTubeEmbedUrl = function() {
+  const videoId = this.getYouTubeVideoId();
+  if (!videoId) return null;
+  
+  return `https://www.youtube.com/embed/${videoId}`;
+};
 
 module.exports = mongoose.model('Workshop', WorkshopSchema);

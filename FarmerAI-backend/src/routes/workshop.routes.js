@@ -2,9 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middlewares/auth.middleware');
+const authorizeRoles = require('../middlewares/role.middleware');
+const { workshopUpload, handleMulterError } = require('../middlewares/imageUpload.middleware');
 const {
   getAllWorkshops,
   getWorkshopById,
+  createWorkshop,
+  updateWorkshop,
+  deleteWorkshop,
   createWorkshopSubscriptionOrder,
   verifyWorkshopSubscriptionPayment,
   getUserSubscriptions,
@@ -27,5 +32,13 @@ router.use(authenticateToken);
 router.post('/subscription/order', createWorkshopSubscriptionOrder);
 router.post('/subscription/verify', verifyWorkshopSubscriptionPayment);
 router.get('/subscriptions', getUserSubscriptions);
+
+// Admin routes (require admin role)
+router.use(authorizeRoles(['admin']));
+
+// Workshop CRUD operations
+router.post('/', workshopUpload.single('thumbnail'), handleMulterError, createWorkshop);
+router.put('/:id', workshopUpload.single('thumbnail'), handleMulterError, updateWorkshop);
+router.delete('/:id', deleteWorkshop);
 
 module.exports = router;

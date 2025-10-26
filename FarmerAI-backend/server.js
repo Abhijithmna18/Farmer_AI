@@ -24,6 +24,11 @@ const createUploadDirectories = () => {
     path.join(__dirname, 'uploads', 'profile-pictures'),
     path.join(__dirname, 'uploads', 'warehouses'),
     path.join(__dirname, 'uploads', 'feedback-attachments'),
+    path.join(__dirname, 'uploads', 'gallery'),
+    path.join(__dirname, 'uploads', 'blogs'),
+    path.join(__dirname, 'uploads', 'home-content'),
+    path.join(__dirname, 'uploads', 'workshop-tutorials'),
+    path.join(__dirname, 'uploads', 'events'),
     path.join(__dirname, 'src', 'uploads')
   ];
 
@@ -64,6 +69,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/plants/uploads', express.static(path.join(__dirname, 'src', 'uploads')));
 app.use('/uploads/profile-pictures', express.static(path.join(__dirname, 'uploads', 'profile-pictures')));
 app.use('/uploads/warehouses', express.static(path.join(__dirname, 'uploads', 'warehouses')));
+app.use('/uploads/gallery', express.static(path.join(__dirname, 'uploads', 'gallery')));
+app.use('/uploads/blogs', express.static(path.join(__dirname, 'uploads', 'blogs')));
+app.use('/uploads/home-content', express.static(path.join(__dirname, 'uploads', 'home-content')));
+app.use('/uploads/workshop-tutorials', express.static(path.join(__dirname, 'uploads', 'workshop-tutorials')));
+app.use('/uploads/events', express.static(path.join(__dirname, 'uploads', 'events')));
 
 // Connect Database
 connectDB();
@@ -102,6 +112,10 @@ app.use('/api/test-razorpay', require('./src/routes/test-razorpay.routes'));
 app.use('/api/contact', require('./src/routes/contact.routes'));
 app.use('/api/farm-monitoring', require('./src/routes/farm-monitoring.routes'));
 app.use('/api/workshops', require('./src/routes/workshop.routes'));
+app.use('/api/gallery', require('./src/routes/gallery.routes'));
+app.use('/api/blogs', require('./src/routes/blog.routes'));
+app.use('/api/home-content', require('./src/routes/homeContent.routes'));
+app.use('/api/workshop-tutorials', require('./src/routes/workshopTutorial.routes'));
 
 // Health check
 app.get('/', (req, res) => {

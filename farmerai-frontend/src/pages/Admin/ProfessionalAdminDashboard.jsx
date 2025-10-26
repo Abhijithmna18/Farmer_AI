@@ -110,9 +110,22 @@ export default function ProfessionalAdminDashboard() {
       const response = await apiClient.get('/admin/stats');
       
       console.log('API call successful:', response.data);
+      console.log('Response structure:', {
+        success: response.data.success,
+        data: response.data.data,
+        hasData: !!response.data.data,
+        dataKeys: response.data.data ? Object.keys(response.data.data) : []
+      });
+      
       return response.data.data;
     } catch (error) {
       console.error('API call failed:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
       throw error;
     }
   };
@@ -139,6 +152,15 @@ export default function ProfessionalAdminDashboard() {
       try {
         const statsData = await fetchAdminStats();
         console.log('Stats data received:', statsData);
+        console.log('Stats data validation:', {
+          totalRevenue: statsData?.totalRevenue,
+          pendingApprovals: statsData?.pendingApprovals,
+          completedBookings: statsData?.completedBookings,
+          totalBookings: statsData?.totalBookings,
+          totalUsers: statsData?.totalUsers,
+          totalWarehouses: statsData?.totalWarehouses
+        });
+        
         setOverview(statsData);
         
         // Set other stats based on the data we received
@@ -157,6 +179,24 @@ export default function ProfessionalAdminDashboard() {
         
         setPaymentStats({
           totalAmount: statsData.totalRevenue || 0
+        });
+        
+        console.log('State updated:', {
+          overview: statsData,
+          warehouseStats: {
+            activeWarehouses: statsData.totalWarehouses || 0,
+            pendingWarehouses: statsData.pendingApprovals || 0,
+            inactiveWarehouses: 0
+          },
+          bookingStats: {
+            totalBookings: statsData.totalBookings || 0,
+            completedBookings: statsData.completedBookings || 0,
+            pendingBookings: statsData.activeBookings ? (statsData.totalBookings - statsData.completedBookings) : 0,
+            cancelledBookings: 0
+          },
+          paymentStats: {
+            totalAmount: statsData.totalRevenue || 0
+          }
         });
       } catch (apiError) {
         console.error('API call failed:', apiError);
@@ -243,6 +283,15 @@ export default function ProfessionalAdminDashboard() {
     bookingStats,
     paymentStats,
     pendingEvents
+  });
+
+  console.log('Stats values for display:', {
+    totalUsers: overview?.totalUsers || 0,
+    activeWarehouses: warehouseStats?.activeWarehouses || 0,
+    totalBookings: bookingStats?.totalBookings || 0,
+    totalRevenue: paymentStats?.totalAmount || 0,
+    pendingApprovals: warehouseStats?.pendingWarehouses || 0,
+    completedBookings: bookingStats?.completedBookings || 0
   });
 
   const stats = [

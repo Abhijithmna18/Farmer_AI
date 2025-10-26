@@ -57,6 +57,12 @@ apiClient.interceptors.request.use((config) => {
   config.headers["Pragma"] = "no-cache";
   config.headers["Expires"] = "0";
   
+  // Increase timeout for plant identification endpoints
+  if (config.url && (config.url.includes('/plants/upload') || config.url.includes('/plants/classify'))) {
+    config.timeout = 300000; // 5 minutes (300 seconds) for plant identification to match backend
+    console.log('⏱️ Increased timeout to 5 minutes for plant identification');
+  }
+  
   console.log('📤 Request headers:', config.headers);
   return config;
 });
