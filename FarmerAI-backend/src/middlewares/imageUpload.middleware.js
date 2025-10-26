@@ -4,6 +4,12 @@ const fs = require('fs');
 
 // Create uploads directory structure
 const createUploadDirs = () => {
+  // Skip directory creation in serverless environments
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    console.log('Skipping upload directory creation in serverless environment');
+    return;
+  }
+
   const dirs = [
     'uploads/content-images',
     'uploads/gallery',
@@ -29,9 +35,12 @@ const getStorageConfig = (subfolder = 'content-images') => {
   return multer.diskStorage({
     destination: function (req, file, cb) {
       const uploadDir = path.join(__dirname, '../../uploads', subfolder);
-      // Ensure directory exists
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+      // Skip directory creation in serverless environments
+      if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        // Ensure directory exists
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
       }
       cb(null, uploadDir);
     },

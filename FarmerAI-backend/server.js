@@ -19,6 +19,12 @@ const app = express();
 
 // Create upload directories if they don't exist
 const createUploadDirectories = () => {
+  // Skip directory creation in serverless environments (Vercel, AWS Lambda, etc.)
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production') {
+    logger.info('Skipping upload directory creation in serverless/production environment');
+    return;
+  }
+
   const uploadDirs = [
     path.join(__dirname, 'uploads'),
     path.join(__dirname, 'uploads', 'profile-pictures'),
@@ -33,9 +39,13 @@ const createUploadDirectories = () => {
   ];
 
   uploadDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      logger.info(`Created upload directory: ${dir}`);
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        logger.info(`Created upload directory: ${dir}`);
+      }
+    } catch (error) {
+      logger.warn(`Failed to create directory ${dir}: ${error.message}`);
     }
   });
 };
@@ -65,15 +75,25 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static: serve uploaded images
-app.use('/api/plants/uploads', express.static(path.join(__dirname, 'src', 'uploads')));
-app.use('/uploads/profile-pictures', express.static(path.join(__dirname, 'uploads', 'profile-pictures')));
-app.use('/uploads/warehouses', express.static(path.join(__dirname, 'uploads', 'warehouses')));
-app.use('/uploads/gallery', express.static(path.join(__dirname, 'uploads', 'gallery')));
-app.use('/uploads/blogs', express.static(path.join(__dirname, 'uploads', 'blogs')));
-app.use('/uploads/home-content', express.static(path.join(__dirname, 'uploads', 'home-content')));
-app.use('/uploads/workshop-tutorials', express.static(path.join(__dirname, 'uploads', 'workshop-tutorials')));
-app.use('/uploads/events', express.static(path.join(__dirname, 'uploads', 'events')));
+// Static: serve uploaded images (only in non-serverless environments)
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.use('/api/plants/uploads', express.static(path.join(__dirname, 'src', 'uploads')));
+  app.use('/uploads/profile-pictures', express.static(path.join(__dirname, 'uploads', 'profile-pictures')));
+  app.use('/uploads/warehouses', express.static(path.join(__dirname, 'uploads', 'warehouses')));
+  app.use('/uploads/gallery', express.static(path.join(__dirname, 'uploads', 'gallery')));
+  app.use('/uploads/blogs', express.static(path.join(__dirname, 'uploads', 'blogs')));
+  app.use('/uploads/home-content', express.static(path.join(__dirname, 'uploads', 'home-content')));
+  app.use('/uploads/workshop-tutorials', express.static(path.join(__dirname, 'uploads', 'workshop-tutorials')));
+  app.use('/uploads/events', express.static(path.join(__dirname, 'uploads', 'events')));
+} else {
+  // In serverless environments, serve a placeholder or redirect to cloud storage
+  app.use('/uploads/*', (req, res) => {
+    res.status(404).json({ 
+      message: 'File not available in serverless environment. Use cloud storage for file uploads.',
+      path: req.path 
+    });
+  });
+}
 
 // Connect Database
 connectDB();
@@ -132,19 +152,23 @@ module.exports = app;
 if (require.main === module) {
   const PORT = process.env.PORT || 5002;
   const server = http.createServer(app);
-  // Initialize Socket.IO realtime service
-  try {
-    initRealtime(server, [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175', // Added 5175
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174',
-      'http://127.0.0.1:5175' // Added 5175
-    ]);
-    logger.info('🔌 Realtime service initialized');
-  } catch (e) {
-    logger.error('Failed to initialize realtime service:', e?.message || e);
+  // Initialize Socket.IO realtime service (only in non-serverless environments)
+  if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    try {
+      initRealtime(server, [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175', // Added 5175
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175' // Added 5175
+      ]);
+      logger.info('🔌 Realtime service initialized');
+    } catch (e) {
+      logger.error('Failed to initialize realtime service:', e?.message || e);
+    }
+  } else {
+    logger.info('🔌 Realtime service disabled in serverless environment');
   }
   server.listen(PORT, async () => {
     logger.info(`✅ Server running on http://localhost:${PORT}`);
@@ -164,28 +188,33 @@ if (require.main === module) {
       logger.error('Failed to bootstrap superadmin:', e?.message || e);
     }
 
-    // Start reminder service
-    try {
-      reminderService.start();
-      logger.info('📧 Reminder service started successfully');
-    } catch (e) {
-      logger.error('Failed to start reminder service:', e?.message || e);
-    }
-    
-    // Start enhanced sensor data scheduler
-    try {
-      enhancedSensorDataScheduler.start();
-      logger.info('🌡️ Enhanced sensor data scheduler started successfully');
-    } catch (e) {
-      logger.error('Failed to start enhanced sensor data scheduler:', e?.message || e);
-    }
-    
-    // Start MQTT Adafruit service
-    try {
-      mqttAdafruitService.connect();
-      logger.info('📡 MQTT Adafruit service started successfully');
-    } catch (e) {
-      logger.error('Failed to start MQTT Adafruit service:', e?.message || e);
+    // Start services only in non-serverless environments
+    if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      // Start reminder service
+      try {
+        reminderService.start();
+        logger.info('📧 Reminder service started successfully');
+      } catch (e) {
+        logger.error('Failed to start reminder service:', e?.message || e);
+      }
+      
+      // Start enhanced sensor data scheduler
+      try {
+        enhancedSensorDataScheduler.start();
+        logger.info('🌡️ Enhanced sensor data scheduler started successfully');
+      } catch (e) {
+        logger.error('Failed to start enhanced sensor data scheduler:', e?.message || e);
+      }
+      
+      // Start MQTT Adafruit service
+      try {
+        mqttAdafruitService.connect();
+        logger.info('📡 MQTT Adafruit service started successfully');
+      } catch (e) {
+        logger.error('Failed to start MQTT Adafruit service:', e?.message || e);
+      }
+    } else {
+      logger.info('🚀 Running in serverless environment - background services disabled');
     }
   });
 }

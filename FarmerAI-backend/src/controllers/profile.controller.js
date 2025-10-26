@@ -8,11 +8,16 @@ const { authenticateToken } = require('../middlewares/auth.middleware');
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const uploadDir = path.join(__dirname, '../../uploads/profile-pictures');
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
+    // Skip directory creation in serverless environments
+    if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      try {
+        await fs.mkdir(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+      } catch (error) {
+        cb(error);
+      }
+    } else {
       cb(null, uploadDir);
-    } catch (error) {
-      cb(error);
     }
   },
   filename: (req, file, cb) => {

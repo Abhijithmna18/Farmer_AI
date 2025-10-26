@@ -12,15 +12,19 @@ const fs = require('fs');
 
 // Configure multer storage for warehouse photos (disk storage)
 const warehouseUploadsDir = path.join(__dirname, '../../uploads/warehouses');
-// Ensure upload directory exists
-if (!fs.existsSync(warehouseUploadsDir)) {
-  fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+// Ensure upload directory exists (skip in serverless environments)
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (!fs.existsSync(warehouseUploadsDir)) {
+    fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+  }
 }
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Ensure directory exists before saving
-    if (!fs.existsSync(warehouseUploadsDir)) {
-      fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+    // Ensure directory exists before saving (skip in serverless environments)
+    if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      if (!fs.existsSync(warehouseUploadsDir)) {
+        fs.mkdirSync(warehouseUploadsDir, { recursive: true });
+      }
     }
     cb(null, warehouseUploadsDir);
   },
