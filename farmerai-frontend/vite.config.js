@@ -11,11 +11,23 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5173
+    port: process.env.PORT || 5173,
+    host: true
   },
   resolve: { // Add this resolve block
     alias: {
       "@": path.resolve(__dirname, "./src"), // Alias @ to ./src
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          mui: ['@mui/material', '@emotion/react', '@emotion/styled'],
+          charts: ['recharts'],
+        }
+      }
+    }
+  }
 });
