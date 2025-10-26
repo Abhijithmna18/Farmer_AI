@@ -102,3 +102,4 @@ blogSchema.index({ viewCount: -1 });
 
 module.exports = mongoose.model('Blog', blogSchema);
 
+
