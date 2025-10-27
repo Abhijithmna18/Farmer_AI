@@ -12,7 +12,12 @@ export default defineConfig({
   ],
   server: {
     port: process.env.PORT || 5173,
-    host: true
+    host: true,
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      'farmer-ai-4.onrender.com'
+    ]
   },
   resolve: { // Add this resolve block
     alias: {
