@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "serve": "vite preview --port $PORT",
+    "serve": "vite preview --host --port ${PORT:-10000}",
     "test": "vitest"
   },
   "dependencies": {

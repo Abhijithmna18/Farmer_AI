@@ -17,7 +17,13 @@ export default defineConfig({
       'localhost',
       '127.0.0.1',
       'farmer-ai-4.onrender.com'
-    ]
+    ],
+    // Disable HMR in production
+    hmr: process.env.NODE_ENV === 'production' ? false : {
+      protocol: 'wss',
+      host: 'farmer-ai-4.onrender.com',
+      port: 443
+    }
   },
   resolve: { // Add this resolve block
     alias: {
