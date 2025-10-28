@@ -20,8 +20,7 @@ const UserSchema = new mongoose.Schema(
     userType: { 
       type: String, 
       enum: ['farmer', 'buyer', 'both', 'warehouse-owner'], 
-      default: 'farmer',
-      index: true 
+      default: 'farmer'
     },
 
     // Extended profile fields

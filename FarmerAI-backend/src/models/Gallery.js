@@ -68,3 +68,4 @@ gallerySchema.index({ createdAt: -1 });
 module.exports = mongoose.model('Gallery', gallerySchema);
 
 
+

@@ -33,8 +33,8 @@ const WorkshopSubscriptionSchema = new mongoose.Schema(
       currency: { type: String, default: 'INR' }
     },
     razorpay: {
-      orderId: { type: String, index: true },
-      paymentId: { type: String, index: true },
+      orderId: { type: String },
+      paymentId: { type: String },
       signature: { type: String }
     },
     status: {

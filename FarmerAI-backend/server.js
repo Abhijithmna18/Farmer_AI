@@ -136,6 +136,7 @@ app.use('/api/gallery', require('./src/routes/gallery.routes'));
 app.use('/api/blogs', require('./src/routes/blog.routes'));
 app.use('/api/home-content', require('./src/routes/homeContent.routes'));
 app.use('/api/workshop-tutorials', require('./src/routes/workshopTutorial.routes'));
+app.use('/api/ml', require('./src/ml/routes/ml'));
 
 // Health check
 app.get('/', (req, res) => {

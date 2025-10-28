@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Debug Tool</h1>
+    
+    <div id="status" class="status">Click "Check Auth" to see your authentication status</div>
+    
+    <button onclick="checkAuth()">Check Auth</button>
+    <button onclick="clearAuth()">Clear Auth</button>
+    <button onclick="testPayment()">Test Payment Flow</button>
+    
+    <script>
+        function checkAuth() {
+            const status = document.getElementById('status');
+            const token = localStorage.getItem('token');
+            const email = localStorage.getItem('email');
+            const role = localStorage.getItem('role');
+            const userId = localStorage.getItem('userId');
+            
+            let html = '<h3>Authentication Status:</h3>';
+            html += `<p><strong>Token:</strong> ${token ? 'Present (' + token.substring(0, 20) + '...)' : 'Missing'}</p>`;
+            html += `<p><strong>Email:</strong> ${email || 'Not found'}</p>`;
+            html += `<p><strong>Role:</strong> ${role || 'Not set'}</p>`;
+            html += `<p><strong>User ID:</strong> ${userId || 'Not set'}</p>`;
+            html += `<p><strong>Session Storage Token:</strong> ${sessionStorage.getItem('token') ? 'Present' : 'Missing'}</p>`;
+            html += `<p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>`;
+            
+            // Check if user would be considered authenticated
+            const isAuth = !!(token || email);
+            html += `<p><strong>Would be authenticated:</strong> <span style="color: ${isAuth ? 'green' : 'red'}">${isAuth ? 'YES' : 'NO'}</span></p>`;
+            
+            status.innerHTML = html;
+            status.className = `status ${isAuth ? 'success' : 'error'}`;
+        }
+        
+        function clearAuth() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.getElementById('status').innerHTML = '<p>All authentication data cleared</p>';
+            document.getElementById('status').className = 'status error';
+        }
+        
+        function testPayment() {
+            const token = localStorage.getItem('token');
+            const email = localStorage.getItem('email');
+            const isAuth = !!(token || email);
+            
+            if (!isAuth) {
+                alert('❌ Authentication check failed - This is the error you\'re seeing in Payment.jsx');
+                document.getElementById('status').innerHTML = '<p style="color: red;">❌ Authentication check failed - User would be redirected to login</p>';
+                document.getElementById('status').className = 'status error';
+            } else {
+                alert('✅ Authentication check passed - Payment would proceed');
+                document.getElementById('status').innerHTML = '<p style="color: green;">✅ Authentication check passed - Payment would proceed</p>';
+                document.getElementById('status').className = 'status success';
+            }
+        }
+        
+        // Run check on load
+        checkAuth();
+    </script>
+</body>
+</html>

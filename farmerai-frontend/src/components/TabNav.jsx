@@ -2,11 +2,19 @@ import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import ThemeToggle from "./ThemeToggle";
-import { Home, Sprout, BarChart2, User, Settings, MessageSquare, MessageCircle, Warehouse, Calendar, Activity, Video } from "lucide-react";
+import { Home, Sprout, BarChart2, User, Settings, MessageSquare, MessageCircle, Warehouse, Calendar, Activity, Video, Brain, Target, Leaf, Droplets, TrendingUp, Shield } from "lucide-react";
 
 export default function TabNav({ isOpen, onToggle }) {
-	const { user, loading } = useAuth();
+	const authContext = useAuth();
 	const location = useLocation();
+	
+	// Add error handling for undefined auth context
+	if (!authContext) {
+		console.error('AuthContext is undefined in TabNav');
+		return null;
+	}
+	
+	const { user, loading } = authContext;
 
 	// Check if user is admin
 	const isAdmin = user && (user.role === 'admin' || (Array.isArray(user.roles) && user.roles.includes('admin')));
@@ -24,6 +32,16 @@ export default function TabNav({ isOpen, onToggle }) {
 		// removed History entry that pointed to /interaction-history
 		{ label: "Profile", to: "/profile", Icon: User },
 		{ label: "Settings", to: "/settings", Icon: Settings }
+	];
+
+	// ML Features menu items
+	const mlMenu = [
+		{ label: "AI Insights", to: "/ml/insights", Icon: Brain },
+		{ label: "Yield Prediction", to: "/ml/yield", Icon: Target },
+		{ label: "Fertilizer Recommendation", to: "/ml/fertilizer", Icon: Leaf },
+		{ label: "Irrigation AI", to: "/ml/irrigation", Icon: Droplets },
+		{ label: "Price Prediction", to: "/ml/pricing", Icon: TrendingUp },
+		{ label: "Health Monitor", to: "/ml/health", Icon: Shield }
 	];
 
 	// Admin menu items
@@ -55,7 +73,7 @@ export default function TabNav({ isOpen, onToggle }) {
 			>
 				<div className="flex items-center justify-between mb-6">
 					<div className="flex items-center gap-3">
-						{loading ? (
+						{loading || !user ? (
 							<div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-slate-700 animate-pulse" aria-hidden />
 						) : (
 							<div className="relative">
@@ -69,10 +87,10 @@ export default function TabNav({ isOpen, onToggle }) {
 						)}
 						<div>
 							<div className="text-sm font-semibold text-gray-800 dark:text-slate-100">
-								{loading ? <div className="h-3 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" aria-hidden /> : (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.displayName || user?.name || (user?.email || 'Farmer').split('@')[0])}
+								{loading || !user ? <div className="h-3 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" aria-hidden /> : (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.displayName || user?.name || (user?.email || 'Farmer').split('@')[0])}
 							</div>
 							<div className="text-xs text-green-700 font-medium flex items-center gap-1 mt-0.5">
-								{loading ? <div className="h-3 w-14 bg-gray-200 dark:bg-slate-700 rounded mt-1 animate-pulse" aria-hidden /> : (<>
+								{loading || !user ? <div className="h-3 w-14 bg-gray-200 dark:bg-slate-700 rounded mt-1 animate-pulse" aria-hidden /> : (<>
 									<span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden />
 									<span>{user?.role ? String(user.role).toUpperCase() : 'USER'}</span>
 								</>)}
@@ -136,6 +154,25 @@ export default function TabNav({ isOpen, onToggle }) {
 											<Icon className="w-4 h-4" aria-hidden />
 										</span>
 										<span className="font-medium flex-1">{label}</span>
+									</NavLink>
+								))}
+							</nav>
+
+							{/* ML Features Section */}
+							<div className="text-xs uppercase tracking-wide text-gray-400 px-3 mt-4 mb-2">AI Features</div>
+							<nav className="space-y-1" aria-label="ML Features">
+								{mlMenu.map(({ to, label, Icon }) => (
+									<NavLink
+										key={to}
+										to={to}
+										className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-gray-700 hover:bg-purple-50/80 ${isActive ? 'bg-purple-600 text-white shadow-purple-300' : ''}`}
+										onClick={() => { if (onToggle && window.innerWidth < 768) onToggle(); }}
+									>
+										<span className="grid place-items-center w-8 h-8 rounded-lg bg-purple-100 text-purple-700 group-hover:bg-purple-200">
+											<Icon className="w-4 h-4" aria-hidden />
+										</span>
+										<span className="font-medium flex-1">{label}</span>
+										<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">AI</span>
 									</NavLink>
 								))}
 							</nav>

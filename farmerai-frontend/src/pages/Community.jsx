@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import apiClient from '../services/apiClient';
 import { 
   MessageSquare, 
   Calendar, 
@@ -32,7 +33,6 @@ import Toast from '../components/Toast';
 import HomeButton from '../components/HomeButton';
 import JoinCommunityForm from '../components/JoinCommunityForm';
 import useAuth from '../hooks/useAuth';
-import apiClient from '../services/apiClient';
 import PostDetailModal from '../components/community/PostDetailModal';
 
 // Mock data for discussions
@@ -81,58 +81,6 @@ const MOCK_POSTS = [
     commentCount: 12,
     views: 210,
     createdAt: '2025-10-22T09:45:00Z'
-  }
-];
-
-// Mock data for events
-const MOCK_EVENTS = [
-  {
-    _id: '1',
-    title: 'Webinar: Using AI for Precision Fertilization',
-    description: 'Learn how to use AI tools to optimize fertilizer application based on soil data and crop needs. Special focus on nitrogen management for wheat crops.',
-    eventType: 'webinar',
-    suggestedBy: { name: 'Dr. Anand Sharma' },
-    location: { district: 'Online', state: 'Zoom' },
-    schedule: { 
-      startDate: '2025-10-30T16:00:00Z', 
-      startTime: '4:00 PM IST' 
-    },
-    cost: { isFree: true },
-    registrationCount: 124,
-    capacity: { maxAttendees: 200 },
-    tags: ['AI', 'fertilization', 'webinar']
-  },
-  {
-    _id: '2',
-    title: 'Local Meetup: Smart Irrigation Workshop (Punjab)',
-    description: 'Hands-on workshop on installing and maintaining smart irrigation systems. Bring your questions and farm maps for personalized advice.',
-    eventType: 'workshop',
-    suggestedBy: { name: 'Karan Singh' },
-    location: { district: 'Ludhiana', state: 'Punjab' },
-    schedule: { 
-      startDate: '2025-11-05T09:00:00Z', 
-      startTime: '9:00 AM IST' 
-    },
-    cost: { isFree: false, amount: 200 },
-    registrationCount: 32,
-    capacity: { maxAttendees: 50 },
-    tags: ['irrigation', 'workshop', 'Punjab']
-  },
-  {
-    _id: '3',
-    title: 'Q&A with Agri-Tech Expert Dr. Anand',
-    description: 'Live Q&A session with Dr. Anand, leading expert in agricultural AI. Bring your toughest questions about implementing technology on your farm.',
-    eventType: 'seminar',
-    suggestedBy: { name: 'Community Team' },
-    location: { district: 'Online', state: 'YouTube Live' },
-    schedule: { 
-      startDate: '2025-11-12T18:00:00Z', 
-      startTime: '6:00 PM IST' 
-    },
-    cost: { isFree: true },
-    registrationCount: 87,
-    capacity: { maxAttendees: null },
-    tags: ['Q&A', 'expert', 'AI']
   }
 ];
 
@@ -237,7 +185,7 @@ export default function Community() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('discussions');
   const [posts, setPosts] = useState(MOCK_POSTS);
-  const [events, setEvents] = useState(MOCK_EVENTS);
+  const [events, setEvents] = useState([]);
   const [profiles, setProfiles] = useState(MOCK_PROFILES);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -261,6 +209,29 @@ export default function Community() {
     // In a real app, this would fetch from the API
     // For demo, we're using mock data
   }, [activeTab, selectedCategory, selectedEventType]);
+
+  // Fetch events data
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const { data } = await apiClient.get('/events', { 
+          params: { status: 'published', limit: 10 } 
+        });
+        const eventsList = Array.isArray(data?.events) ? data.events : (Array.isArray(data) ? data : []);
+        setEvents(eventsList);
+      } catch (error) {
+        console.error('Failed to fetch events:', error);
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (activeTab === 'events') {
+      fetchEvents();
+    }
+  }, [activeTab]);
 
   const handleCreatePost = () => {
     if (!newPostTitle.trim() || !newPostContent.trim()) {

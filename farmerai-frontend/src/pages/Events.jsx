@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import eventsService from '../services/eventsService';
-import { Calendar, MapPin, Clock, Users, RefreshCcw, Search, Download, Bookmark, Share2 } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, RefreshCcw, Search, Download, Bookmark, Share2, Heart, Star, MessageCircle, TrendingUp, Filter, SortAsc } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 export default function Events(){
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
@@ -16,11 +18,37 @@ export default function Events(){
   const [saved, setSaved] = useState(()=>{
     try { return new Set(JSON.parse(localStorage.getItem('savedEvents')||'[]')); } catch { return new Set(); }
   });
+  
+  // Enhanced state
+  const [difficulty, setDifficulty] = useState('all');
+  const [location, setLocation] = useState('');
+  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+  const [featured, setFeatured] = useState(false);
+  const [sortBy, setSortBy] = useState('dateTime');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showFilters, setShowFilters] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const [likedEvents, setLikedEvents] = useState(new Set());
 
   const load = async (p = 1) => {
     setLoading(true);
     try {
-      const res = await eventsService.list({ q, category: category === 'all' ? undefined : category, status: 'published', when, page: p, limit: 9 });
+      const params = new URLSearchParams({
+        q,
+        category: category === 'all' ? '' : category,
+        difficulty: difficulty === 'all' ? '' : difficulty,
+        location,
+        featured: featured ? 'true' : '',
+        sortBy,
+        sortOrder,
+        page: p,
+        limit: 9
+      });
+
+      if (priceRange.min) params.append('priceMin', priceRange.min);
+      if (priceRange.max) params.append('priceMax', priceRange.max);
+
+      const res = await eventsService.search(params.toString());
       setItems(res?.events || []);
       setPages(res?.pagination?.pages || 1);
       setPage(res?.pagination?.current || p);
@@ -32,20 +60,48 @@ export default function Events(){
     }
   };
 
-  // Featured Training mock card
-  const featuredTraining = useMemo(() => ({
-    _id: 'mock-training-featured',
-    title: 'Hands-on Training: Smart Irrigation Basics',
-    dateTime: new Date(Date.now() + 2*86400000).toISOString(),
-    duration: '2 hours',
-    location: 'Kozhikode, IN',
-    locationDetail: { address: 'Agri Training Center' },
-    attendeeCount: 45,
-    category: 'training',
-    tags: ['training','irrigation','basics'],
-    bannerUrl: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?q=80&w=1200&auto=format&fit=crop',
-    description: 'Practical session covering setup, scheduling, and water-saving tips for small farms.'
-  }), []);
+  const loadRecommendations = async () => {
+    if (!user) return;
+    try {
+      const res = await eventsService.getRecommendations();
+      setRecommendations(res?.recommendations || []);
+    } catch (e) {
+      console.error('Failed to load recommendations:', e);
+    }
+  };
+
+  const toggleLike = async (eventId) => {
+    if (!user) {
+      toast.error('Please login to like events');
+      return;
+    }
+
+    try {
+      const res = await eventsService.toggleLike(eventId);
+      setLikedEvents(prev => {
+        const newSet = new Set(prev);
+        if (res.liked) {
+          newSet.add(eventId);
+        } else {
+          newSet.delete(eventId);
+        }
+        return newSet;
+      });
+      toast.success(res.liked ? 'Event liked!' : 'Event unliked');
+    } catch (e) {
+      console.error('Failed to toggle like:', e);
+      toast.error('Failed to like event');
+    }
+  };
+
+  const trackView = async (eventId) => {
+    try {
+      await eventsService.trackView(eventId);
+    } catch (e) {
+      console.error('Failed to track view:', e);
+    }
+  };
+
 
   const toggleSave = (id) => {
     setSaved(prev => {
@@ -85,6 +141,7 @@ export default function Events(){
     setCategory(c0);
     setWhen(w0);
     load(Number.isNaN(p0) ? 1 : p0);
+    loadRecommendations();
     // categories
     eventsService.categories().then(list => {
       if (Array.isArray(list) && list.length) setCategories(list);
@@ -167,13 +224,40 @@ export default function Events(){
   const [selected, setSelected] = useState(null);
 
   const rsvp = async (ev) => {
+    if (!user) {
+      toast.error('Please login to enroll in events');
+      return;
+    }
+
     try {
-      await eventsService.rsvp(ev._id, 'going');
-      toast.success('RSVP saved');
-      try { localStorage.setItem('lastEvent', JSON.stringify({ id: ev._id, title: ev.title, dateTime: ev.dateTime, location: ev.locationDetail?.address || ev.location || '' })); } catch {}
-      load(page);
+      const response = await eventsService.rsvp(ev._id, 'going');
+      
+      if (response.success) {
+        // Show success message with status
+        if (response.message) {
+          toast.success(response.message);
+        } else {
+          toast.success('Enrollment successful! Check your email for confirmation.');
+        }
+        
+        // Save event details for reference
+        try { 
+          localStorage.setItem('lastEvent', JSON.stringify({ 
+            id: ev._id, 
+            title: ev.title, 
+            dateTime: ev.dateTime, 
+            location: ev.locationDetail?.address || ev.location || '' 
+          })); 
+        } catch {}
+        
+        // Reload the page to update counts
+        load(page);
+      } else {
+        toast.error(response.message || 'Failed to enroll');
+      }
     } catch (e) {
-      toast.error('Failed to RSVP');
+      console.error('RSVP error:', e);
+      toast.error('Failed to enroll. Please try again.');
     }
   };
 
@@ -210,61 +294,6 @@ export default function Events(){
         </div>
       </div>
 
-      {/* Featured Training (mock) */}
-      {(category === 'all' || category === 'training') && (
-        <div className="mb-5">
-          <div className="p-4 md:p-5 border rounded-2xl bg-gradient-to-r from-emerald-50 to-white">
-            <div className="flex flex-col md:flex-row gap-4">
-              <img src={featuredTraining.bannerUrl} alt="training" className="w-full md:w-64 h-40 object-cover rounded-xl" />
-              <div className="flex-1">
-                <div className="text-sm text-emerald-700 font-semibold mb-1">Featured Training</div>
-                <div className="text-xl font-bold text-gray-900">{featuredTraining.title}</div>
-                <div className="mt-2 text-sm text-gray-700">
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {new Date(featuredTraining.dateTime).toLocaleString()}</div>
-                  <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {featuredTraining.locationDetail.address}</div>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg" onClick={()=>rsvp(featuredTraining)}>Enroll</button>
-                  <button className="px-3 py-1.5 border rounded-lg" onClick={()=>setSelected(featuredTraining)}>View Details</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Training Programs (mock x8) */}
-      {(category === 'all' || category === 'training') && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-900">Training Programs</h3>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => {
-              const ev = {
-                _id: `training-${i+1}`,
-                title: [
-                  'Soil Health 101','Smart Irrigation','Compost Making','Pest Management',
-                  'Market Readiness','Post-harvest Care','Organic Inputs','Greenhouse Basics'
-                ][i],
-                dateTime: new Date(Date.now() + (i+1)*86400000).toISOString(),
-                locationDetail: { address: ['Kochi','Chennai','Bengaluru','Delhi','Pune','Hyderabad','Kolkata','Jaipur'][i] + ', IN' },
-              };
-              return (
-                <div key={ev._id} className="p-4 border rounded-2xl bg-white">
-                  <div className="text-base font-semibold text-gray-900 mb-1">{ev.title}</div>
-                  <div className="text-sm text-gray-600">{new Date(ev.dateTime).toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">{ev.locationDetail.address}</div>
-                  <div className="mt-3 flex gap-2">
-                    <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg" onClick={()=>rsvp(ev)}>Enroll</button>
-                    <button className="px-3 py-1.5 border rounded-lg" onClick={()=>{ setSelected(ev); try { localStorage.setItem('lastEvent', JSON.stringify({ id: ev._id, title: ev.title, dateTime: ev.dateTime, location: ev.locationDetail.address })); } catch {} }}>Details</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* List */}
       {loading ? skeletons : (

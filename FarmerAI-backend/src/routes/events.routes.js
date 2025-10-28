@@ -28,4 +28,16 @@ router.get('/:id/export/csv', eventController.exportCSV);
 router.get('/:id/export/ics', eventController.exportICS);
 router.get('/:id/export/pdf', eventController.exportPDF);
 
+// Enhanced Event Features
+router.get('/search', eventController.searchEvents);
+router.get('/recommendations', authenticateToken, eventController.getRecommendations);
+router.get('/:id/analytics', authenticateToken, eventController.getEventAnalytics);
+router.post('/:id/like', authenticateToken, eventController.toggleLike);
+router.post('/:id/comment', authenticateToken, eventController.addComment);
+router.post('/:id/rate', authenticateToken, eventController.rateEvent);
+router.post('/:id/view', eventController.trackView);
+
+// Admin notifications
+router.get('/admin/notifications', authenticateToken, eventController.getAdminNotifications);
+
 module.exports = router;

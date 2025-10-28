@@ -128,16 +128,27 @@ const MyBookings = () => {
   // Refresh a single booking from the backend, preferring reconcile endpoint
   const refreshBookingById = async (id) => {
     try {
+      console.log('🔄 Attempting to fix pricing for booking:', id);
+      
+      // Try reconcile endpoint first
       let res = await apiClient.get(`/warehouse-bookings/${id}/reconcile`);
       if (!res.data?.success) {
+        console.log('⚠️ Reconcile failed, trying regular endpoint');
         res = await apiClient.get(`/warehouse-bookings/${id}`);
       }
+      
       if (res.data?.success) {
+        console.log('✅ Booking refreshed successfully:', res.data.data);
         const nb = normalizeBooking(res.data.data, user?.name);
         setBookings((prev) => prev.map(b => (b._id === id ? nb : b)));
+        toast.success('Pricing fixed successfully!');
+      } else {
+        console.error('❌ Failed to refresh booking:', res.data?.message);
+        toast.error('Failed to fix pricing. Please try again.');
       }
     } catch (e) {
-      console.error('Refresh booking failed', e);
+      console.error('❌ Refresh booking failed:', e);
+      toast.error('Error fixing pricing. Please try again.');
     }
   };
 
@@ -261,14 +272,23 @@ const MyBookings = () => {
     const customerName = booking.customerName || '—';
     const address = booking.warehouse?.location?.address || 'Location not specified';
     
-    // Determine if there's a pricing issue
-    const hasPricingIssue = !booking.pricing?.totalAmount || booking.pricing.totalAmount === 0;
+    // Determine if there's a pricing issue - check multiple possible pricing fields
+    const totalAmount = booking.pricing?.totalAmount || booking.totalAmount || 0;
+    const hasPricingIssue = !totalAmount || totalAmount === 0;
     const isPaidBooking = booking.payment?.status === 'paid';
+    
+    // Debug logging for pricing detection
+    console.log('🔍 Pricing detection for booking:', booking._id);
+    console.log('   Raw booking data:', booking);
+    console.log('   pricing.totalAmount:', booking.pricing?.totalAmount);
+    console.log('   totalAmount:', booking.totalAmount);
+    console.log('   payment.amountDue:', booking.payment?.amountDue);
+    console.log('   hasPricingIssue:', hasPricingIssue);
+    console.log('   isPaidBooking:', isPaidBooking);
     
     // Get the correct amount to display
     // For paid bookings, we still want to show the total amount
     // For unpaid bookings, we show the amount due
-    const totalAmount = booking.pricing?.totalAmount ?? 0;
     const amountDue = booking.payment?.amountDue ?? totalAmount;
     
     // Determine what to display
@@ -276,6 +296,10 @@ const MyBookings = () => {
     if (hasPricingIssue && !isPaidBooking) {
       // Show ₹0.00 with error indicator for unpaid bookings with pricing issues
       priceDisplay = '₹0.00';
+      console.log('🚨 Zero pricing detected for booking:', booking._id);
+      console.log('   Pricing data:', booking.pricing);
+      console.log('   Total amount:', totalAmount);
+      console.log('   Amount due:', amountDue);
     } else if (isPaidBooking) {
       // For paid bookings, show the total amount
       priceDisplay = formatCurrency(totalAmount);
@@ -283,6 +307,9 @@ const MyBookings = () => {
       // For unpaid bookings, show the amount due
       priceDisplay = formatCurrency(amountDue);
     }
+    
+    // TEMPORARY: Force show pricing error for testing (remove this later)
+    const forceShowPricingError = priceDisplay === '₹0.00' && !isPaidBooking;
     
     // Determine if we should show "Payment Due" badge
     const showPaymentDue = !isPaidBooking && typeof amountDue === 'number' && amountDue > 0;
@@ -336,7 +363,14 @@ const MyBookings = () => {
                 {!showPaymentDue && booking.payment?.status === 'paid' && (
                   <div className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">Paid</div>
                 )}
-                <div className={`text-2xl font-bold ${hasPricingIssue && !isPaidBooking ? 'text-red-600' : 'text-gray-900'}`}>{priceDisplay}</div>
+                <div className={`text-2xl font-bold ${hasPricingIssue && !isPaidBooking ? 'text-red-600' : 'text-gray-900'}`}>
+                  {priceDisplay}
+                  {hasPricingIssue && !isPaidBooking && (
+                    <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                      ERROR
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -365,19 +399,26 @@ const MyBookings = () => {
             </div>
           )}
 
-          {hasPricingIssue && !isPaidBooking && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          {(hasPricingIssue || forceShowPricingError) && !isPaidBooking && (
+            <div className="mb-4 p-4 bg-red-100 border-2 border-red-300 rounded-lg shadow-lg">
               <div className="flex items-center justify-between">
-                <div className="flex items-center text-red-800">
-                  <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
-                  <span className="text-sm font-medium">Pricing calculation error detected. Click "Fix Pricing" to recalculate.</span>
+                <div className="flex items-center text-red-900">
+                  <ExclamationTriangleIcon className="h-6 w-6 mr-3 text-red-600" />
+                  <div>
+                    <span className="text-lg font-bold">⚠️ PRICING ERROR DETECTED</span>
+                    <p className="text-sm mt-1">This booking shows ₹0.00 which indicates a pricing calculation error. Click "Fix Pricing" to recalculate the correct amount.</p>
+                  </div>
                 </div>
                 <button 
-                  onClick={() => onRefresh?.(booking._id)} 
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  onClick={() => {
+                    console.log('🔧 Fixing pricing for booking:', booking._id);
+                    console.log('📊 Current booking data:', booking);
+                    onRefresh?.(booking._id);
+                  }} 
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold text-lg shadow-lg"
                   aria-label="Fix pricing"
                 >
-                  Fix Pricing
+                  🔧 Fix Pricing
                 </button>
               </div>
             </div>

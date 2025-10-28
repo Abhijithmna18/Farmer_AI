@@ -79,7 +79,13 @@ const WarehouseSchema = new mongoose.Schema(
       basePrice: {
         type: Number,
         required: true,
-        min: 0
+        min: [1, 'Base price must be at least ₹1'],
+        validate: {
+          validator: function(v) {
+            return v > 0;
+          },
+          message: 'Base price must be greater than 0'
+        }
       },
       // New: hourly pricing for tonnage-based bookings
       hourlyRatePerTon: {
@@ -94,7 +100,8 @@ const WarehouseSchema = new mongoose.Schema(
       },
       currency: {
         type: String,
-        default: 'INR'
+        default: 'INR',
+        enum: ['INR', 'USD', 'EUR']
       },
       seasonalMultiplier: {
         type: Number,
@@ -313,6 +320,72 @@ WarehouseSchema.statics.getStats = async function(filters = {}) {
     inactiveWarehouses: 0,
     totalCapacity: 0,
     availableCapacity: 0
+  };
+};
+
+// Validation methods to prevent zero pricing issues
+WarehouseSchema.methods.validatePricing = function() {
+  const errors = [];
+  
+  if (!this.pricing || !this.pricing.basePrice) {
+    errors.push('Base price is required');
+  } else if (this.pricing.basePrice <= 0) {
+    errors.push('Base price must be greater than 0');
+  }
+  
+  if (!this.pricing || !this.pricing.pricePerUnit) {
+    errors.push('Price per unit is required');
+  }
+  
+  if (!this.pricing || !this.pricing.currency) {
+    errors.push('Currency is required');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+};
+
+WarehouseSchema.methods.calculatePrice = function(startDate, endDate, quantity = 1) {
+  const validation = this.validatePricing();
+  if (!validation.isValid) {
+    throw new Error(`Invalid pricing data: ${validation.errors.join(', ')}`);
+  }
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    throw new Error('Invalid date format');
+  }
+  
+  if (start >= end) {
+    throw new Error('Start date must be before end date');
+  }
+  
+  const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+  if (duration <= 0) {
+    throw new Error('Duration must be at least 1 day');
+  }
+  
+  if (quantity <= 0) {
+    throw new Error('Quantity must be greater than 0');
+  }
+  
+  const basePrice = this.pricing.basePrice;
+  const totalAmount = basePrice * duration * quantity;
+  
+  if (totalAmount <= 0) {
+    throw new Error('Calculated total amount must be greater than 0');
+  }
+  
+  return {
+    basePrice: basePrice,
+    duration: duration,
+    quantity: quantity,
+    totalAmount: totalAmount,
+    currency: this.pricing.currency
   };
 };
 

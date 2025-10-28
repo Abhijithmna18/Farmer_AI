@@ -8,35 +8,6 @@ export default function EventsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const mockEvents = [
-    {
-      title: 'Soil Health Workshop',
-      description: 'Learn soil testing and nutrient management basics.',
-      dateTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-      location: 'Community Center, Kochi',
-      imageUrl:
-        '/Upcoming%20Events1.png',
-      registrationLink: '/events',
-    },
-    {
-      title: 'Irrigation Best Practices',
-      description: 'Efficient water use techniques and scheduling.',
-      dateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      location: 'Agri Hall, Thrissur',
-      imageUrl:
-        '/Upcoming%20Events2.png',
-      registrationLink: '/events',
-    },
-    {
-      title: 'Organic Pest Control',
-      description: 'Natural pest control methods for small farms.',
-      dateTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-      location: 'FarmerAI Campus, Palakkad',
-      imageUrl:
-        '/Upcoming%20Events3.png',
-      registrationLink: '/events',
-    },
-  ];
 
   // Curated fallback images used when an event doesn't provide one
   const fallbackImages = [
@@ -59,11 +30,11 @@ export default function EventsSection() {
           }));
           setEvents(withImages);
         } else {
-          setEvents(mockEvents);
+          setEvents([]);
         }
       } catch (e) {
         setError('Failed to load events');
-        setEvents(mockEvents);
+        setEvents([]);
       } finally {
         setLoading(false);
       }

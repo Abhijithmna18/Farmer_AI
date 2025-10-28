@@ -5,7 +5,7 @@ const Joi = require('joi');
  * Validation schemas
  */
 
-const nameRegex = /^[A-Za-z]{2,}$/;
+const nameRegex = /^[A-Za-z][A-Za-z .'-]{1,}$/;
 
 const registerSchema = Joi.object({
   // Allow either a single name or first/last names
@@ -15,7 +15,7 @@ const registerSchema = Joi.object({
     then: Joi.optional(),
     otherwise: Joi.required(),
   }).messages({
-    'string.pattern.base': 'First name must contain only letters and be at least 2 characters',
+    'string.pattern.base': 'First name must start with a letter and contain only letters, spaces, hyphens, apostrophes, and dots',
     'string.min': 'First name must be at least 2 characters long'
   }),
   lastName: Joi.string().pattern(nameRegex).min(2).when('name', {
@@ -23,7 +23,7 @@ const registerSchema = Joi.object({
     then: Joi.optional(),
     otherwise: Joi.required(),
   }).messages({
-    'string.pattern.base': 'Last name must contain only letters and be at least 2 characters',
+    'string.pattern.base': 'Last name must start with a letter and contain only letters, spaces, hyphens, apostrophes, and dots',
     'string.min': 'Last name must be at least 2 characters long'
   }),
   email: Joi.string().email().required(),

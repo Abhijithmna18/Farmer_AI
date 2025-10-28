@@ -19,7 +19,23 @@ import {
   Download,
   ExternalLink,
   X,
-  Save
+  Save,
+  BarChart3,
+  TrendingUp,
+  Star,
+  Users,
+  Settings,
+  Bell,
+  Mail,
+  Phone,
+  MapPin,
+  Award,
+  Target,
+  Zap,
+  Shield,
+  Activity,
+  PieChart,
+  LineChart
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import Section from '../../components/Section';
@@ -37,12 +53,17 @@ export default function AdminFeedback() {
   const [showDetails, setShowDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [processingId, setProcessingId] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [filters, setFilters] = useState({
     status: 'all',
     type: 'all',
     priority: 'all',
-    search: ''
+    search: '',
+    dateRange: 'all',
+    assignedTo: 'all'
   });
   const [pagination, setPagination] = useState({
     current: 1,
@@ -55,6 +76,8 @@ export default function AdminFeedback() {
     completed: 0,
     total: 0
   });
+  const [analytics, setAnalytics] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [editData, setEditData] = useState({
     status: '',
     adminNotes: '',
@@ -75,8 +98,49 @@ export default function AdminFeedback() {
   useEffect(() => {
     if (user && user.role === 'admin') {
       loadFeedback();
+      loadAnalytics();
+      loadNotifications();
     }
   }, [user, filters]);
+
+  // Handle tab changes
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      let newFilters = { ...filters };
+      
+      if (activeTab === 'pending') {
+        newFilters.status = 'Received';
+      } else if (activeTab === 'in-progress') {
+        newFilters.status = 'In Progress';
+      } else if (activeTab === 'completed') {
+        newFilters.status = 'Completed';
+      } else if (activeTab === 'overview') {
+        newFilters.status = 'all';
+      }
+      
+      if (newFilters.status !== filters.status) {
+        setFilters(newFilters);
+      }
+    }
+  }, [activeTab, user]);
+
+  const loadAnalytics = async () => {
+    try {
+      const response = await apiClient.get('/feedback/admin/analytics');
+      setAnalytics(response.data);
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const response = await apiClient.get('/feedback/admin/notifications');
+      setNotifications(response.data);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
 
   const loadFeedback = async (page = 1) => {
     setLoading(true);
@@ -229,11 +293,89 @@ export default function AdminFeedback() {
   return (
     <div className="max-w-7xl mx-auto">
       <HomeButton />
-      <PageHeader
-        title="Feedback Management"
-        subtitle="Manage and respond to user feedback"
-        icon="🛠️"
-      />
+      
+      {/* Enhanced Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl">
+              <MessageSquare className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Feedback Management</h1>
+              <p className="text-gray-600 mt-1">Manage and respond to user feedback with advanced analytics</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            {/* Notifications */}
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
+            >
+              <Bell className="w-6 h-6" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+            
+            {/* Analytics Toggle */}
+            <button
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className={`p-3 rounded-xl transition-colors ${
+                showAnalytics 
+                  ? 'bg-green-100 text-green-600' 
+                  : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+              }`}
+            >
+              <BarChart3 className="w-6 h-6" />
+            </button>
+            
+            {/* Settings */}
+            <button className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors">
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Enhanced Tabs */}
+        <div className="bg-white/90 backdrop-blur-xl p-2 rounded-3xl border-2 border-green-100 border-opacity-60 shadow-[0_25px_60px_-15px_rgba(76,175,80,0.18)]">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'overview', label: 'Overview', icon: Activity, count: counts.total },
+              { id: 'pending', label: 'Pending', icon: Clock, count: counts.received },
+              { id: 'in-progress', label: 'In Progress', icon: AlertCircle, count: counts.inProgress },
+              { id: 'completed', label: 'Completed', icon: CheckCircle, count: counts.completed },
+              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+              { id: 'reports', label: 'Reports', icon: FileText }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-2xl transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                }`}
+              >
+                <tab.icon className="w-5 h-5" />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    activeTab === tab.id 
+                      ? 'bg-white/20 text-white' 
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -364,102 +506,340 @@ export default function AdminFeedback() {
         </div>
       </div>
 
-      {/* Feedback List */}
+      {/* Content based on active tab */}
       <Section className="space-y-6">
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-          </div>
-        ) : feedback.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-600 mb-2">No feedback found</h3>
-            <p className="text-gray-500">No feedback matches your current filters</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {feedback.map((item) => {
-              const TypeIcon = getTypeIcon(item.type);
-              const StatusIcon = getStatusIcon(item.status);
-              
-              return (
-                <motion.div
-                  key={item._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border-2 border-green-100 border-opacity-60 shadow-[0_25px_60px_-15px_rgba(76,175,80,0.18)]"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className={`p-2 rounded-lg ${getTypeColor(item.type)}`}>
-                          <TypeIcon className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-800">{item.subject}</h4>
-                          <div className="flex items-center space-x-2 text-sm text-gray-600">
-                            <span className="capitalize">{item.type}</span>
-                            <span>•</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(item.priority)}`}>
-                              {item.priority} Priority
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="text-gray-700 mb-4 line-clamp-2">{item.description}</p>
-
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <User className="w-4 h-4" />
-                          <span>{item.userId.name}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <StatusIcon className="w-4 h-4" />
-                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(item.status)}`}>
-                            {item.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(item.createdAt)}</span>
-                        </div>
-                        {item.attachment && (
-                          <div className="flex items-center space-x-1">
-                            <FileText className="w-4 h-4" />
-                            <span>Has attachment</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2 ml-4">
-                      <button
-                        onClick={() => openDetails(item)}
-                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="View Details"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
-                        title="Edit"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => openDeleteModal(item)}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border-2 border-blue-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-blue-500 rounded-xl">
+                    <Zap className="w-6 h-6 text-white" />
                   </div>
-                </motion.div>
-              );
-            })}
+                  <span className="text-2xl font-bold text-blue-600">
+                    {counts.received}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-blue-800 mb-1">Urgent Actions</h3>
+                <p className="text-sm text-blue-600">New feedback requiring immediate attention</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl border-2 border-yellow-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-yellow-500 rounded-xl">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-yellow-600">
+                    {counts.inProgress}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-yellow-800 mb-1">In Progress</h3>
+                <p className="text-sm text-yellow-600">Feedback currently being worked on</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border-2 border-green-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-green-500 rounded-xl">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">
+                    {counts.completed}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-green-800 mb-1">Completed</h3>
+                <p className="text-sm text-green-600">Successfully resolved feedback</p>
+              </motion.div>
+            </div>
+
+            {/* Recent Feedback */}
+            <div className="bg-white rounded-2xl border-2 border-gray-100 p-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Feedback</h3>
+              <div className="space-y-4">
+                {feedback.slice(0, 5).map((item) => {
+                  const TypeIcon = getTypeIcon(item.type);
+                  const StatusIcon = getStatusIcon(item.status);
+                  
+                  return (
+                    <div key={item._id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
+                      <div className={`p-2 rounded-lg ${getTypeColor(item.type)}`}>
+                        <TypeIcon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-800">{item.subject}</h4>
+                        <p className="text-sm text-gray-600">{item.userId?.name || item.userId?.email || 'Anonymous User'} • {formatDate(item.createdAt)}</p>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs ${getStatusColor(item.status)}`}>
+                        {item.status}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'analytics' && analytics && (
+          <div className="space-y-6">
+            {/* Analytics Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl border-2 border-purple-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-purple-500 rounded-xl">
+                    <TrendingUp className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-purple-600">
+                    {analytics.avgResponseTime || 0}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-purple-800 mb-1">Avg Response Time</h3>
+                <p className="text-sm text-purple-600">Days to respond</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border-2 border-indigo-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-indigo-500 rounded-xl">
+                    <Star className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-indigo-600">
+                    {analytics.satisfactionRate || 0}%
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-indigo-800 mb-1">Satisfaction Rate</h3>
+                <p className="text-sm text-indigo-600">User satisfaction</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl border-2 border-pink-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-pink-500 rounded-xl">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-pink-600">
+                    {analytics.activeUsers || 0}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-pink-800 mb-1">Active Users</h3>
+                <p className="text-sm text-pink-600">Users with feedback</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl border-2 border-teal-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-teal-500 rounded-xl">
+                    <Shield className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-teal-600">
+                    {analytics.resolutionRate || 0}%
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-teal-800 mb-1">Resolution Rate</h3>
+                <p className="text-sm text-teal-600">Issues resolved</p>
+              </motion.div>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border-2 border-gray-100 p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Status Distribution</h3>
+                <div className="space-y-4">
+                  {analytics.statusDistribution?.map((item, index) => (
+                    <div key={item.status} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg ${getStatusColor(item.status)}`}>
+                          {item.status === 'Received' && <Clock className="w-4 h-4" />}
+                          {item.status === 'In Progress' && <AlertCircle className="w-4 h-4" />}
+                          {item.status === 'Completed' && <CheckCircle className="w-4 h-4" />}
+                        </div>
+                        <span className="font-medium text-gray-700">{item.status}</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              item.status === 'Received' ? 'bg-yellow-500' :
+                              item.status === 'In Progress' ? 'bg-blue-500' :
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${(item.count / analytics.totalFeedback) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-600 w-8 text-right">
+                          {item.count}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border-2 border-gray-100 p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Type Distribution</h3>
+                <div className="space-y-4">
+                  {analytics.typeDistribution?.map((item, index) => (
+                    <div key={item.type} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg ${getTypeColor(item.type)}`}>
+                          {item.type === 'Bug Report' && <Bug className="w-4 h-4" />}
+                          {item.type === 'Feature Suggestion' && <Lightbulb className="w-4 h-4" />}
+                          {item.type === 'General Comment' && <MessageSquare className="w-4 h-4" />}
+                        </div>
+                        <span className="font-medium text-gray-700">{item.type}</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              item.type === 'Bug Report' ? 'bg-red-500' :
+                              item.type === 'Feature Suggestion' ? 'bg-yellow-500' :
+                              'bg-blue-500'
+                            }`}
+                            style={{ width: `${(item.count / analytics.totalFeedback) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-600 w-8 text-right">
+                          {item.count}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Default feedback list for other tabs */}
+        {(activeTab === 'pending' || activeTab === 'in-progress' || activeTab === 'completed') && (
+          <div className="space-y-6">
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+              </div>
+            ) : feedback.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">No feedback found</h3>
+                <p className="text-gray-500">No feedback matches your current filters</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {feedback.map((item) => {
+                  const TypeIcon = getTypeIcon(item.type);
+                  const StatusIcon = getStatusIcon(item.status);
+                  
+                  return (
+                    <motion.div
+                      key={item._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border-2 border-green-100 border-opacity-60 shadow-[0_25px_60px_-15px_rgba(76,175,80,0.18)]"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-3">
+                            <div className={`p-2 rounded-lg ${getTypeColor(item.type)}`}>
+                              <TypeIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-800">{item.subject}</h4>
+                              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <span className="capitalize">{item.type}</span>
+                                <span>•</span>
+                                <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(item.priority)}`}>
+                                  {item.priority} Priority
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-700 mb-4 line-clamp-2">{item.description}</p>
+
+                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <div className="flex items-center space-x-1">
+                              <User className="w-4 h-4" />
+                              <span>{item.userId?.name || item.userId?.email || 'Anonymous User'}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <StatusIcon className="w-4 h-4" />
+                              <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{formatDate(item.createdAt)}</span>
+                            </div>
+                            {item.attachment && (
+                              <div className="flex items-center space-x-1">
+                                <FileText className="w-4 h-4" />
+                                <span>Has attachment</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 ml-4">
+                          <button
+                            onClick={() => openDetails(item)}
+                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="View Details"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                            title="Edit"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(item)}
+                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </Section>

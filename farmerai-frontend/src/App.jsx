@@ -47,6 +47,12 @@ import WorkshopTutorials from "./pages/WorkshopTutorials";
 import WorkshopDetail from "./pages/WorkshopDetail";
 import WorkshopVideo from "./pages/WorkshopVideo";
 import Subscription from "./pages/Subscription";
+import MLInsights from "./pages/ML/MLInsights";
+import YieldPrediction from "./pages/ML/YieldPrediction";
+import FertilizerRecommendation from "./pages/ML/FertilizerRecommendation";
+import IrrigationAI from "./pages/ML/IrrigationAI";
+import PricePrediction from "./pages/ML/PricePrediction";
+import HealthMonitor from "./pages/ML/HealthMonitor";
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -110,6 +116,13 @@ function App() {
               <Route path="workshops/:id" element={<WorkshopDetail />} />
               <Route path="workshops/:id/watch" element={<WorkshopVideo />} />
               <Route path="subscription/:plan" element={<Subscription />} />
+              {/* ML Routes */}
+              <Route path="ml/insights" element={<MLInsights />} />
+              <Route path="ml/yield" element={<YieldPrediction />} />
+              <Route path="ml/fertilizer" element={<FertilizerRecommendation />} />
+              <Route path="ml/irrigation" element={<IrrigationAI />} />
+              <Route path="ml/pricing" element={<PricePrediction />} />
+              <Route path="ml/health" element={<HealthMonitor />} />
               {/* Removed owner dashboard from user layout */}
             </Route>
           </Route>

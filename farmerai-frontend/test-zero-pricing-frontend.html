@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero Pricing Frontend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        .warning { background: #fff3e0; color: #f57c00; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .pricing-display { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .zero-pricing { border-color: #ff9800; background: #fff3e0; }
+        .valid-pricing { border-color: #4caf50; background: #e8f5e8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Zero Pricing Frontend Test</h1>
+        <p>This tool tests how the frontend handles zero pricing issues.</p>
+        
+        <div class="test-section">
+            <h3>Test 1: Zero Pricing Detection</h3>
+            <button onclick="testZeroPricingDetection()">Test Zero Pricing Detection</button>
+            <div id="detectionResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 2: Pricing Display Components</h3>
+            <button onclick="testPricingDisplay()">Test Pricing Display</button>
+            <div id="displayResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 3: Fix Pricing API Call</h3>
+            <button onclick="testFixPricingAPI()">Test Fix Pricing API</button>
+            <div id="apiResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 4: Real Booking Data</h3>
+            <button onclick="testRealBookingData()">Test with Real Booking Data</button>
+            <div id="realDataResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Mock pricing utility functions (same as in pricingUtils.js)
+        const handleZeroPricing = {
+            isZeroPricing: (pricing) => {
+                if (!pricing) return true;
+                const totalAmount = pricing.totalAmount || 0;
+                return totalAmount <= 0;
+            },
+
+            getZeroPricingText: (pricing) => {
+                if (!pricing) return 'Pricing unavailable';
+                const totalAmount = pricing.totalAmount || 0;
+                if (totalAmount <= 0) return 'Pricing needs to be calculated';
+                return `₹${totalAmount}`;
+            },
+
+            formatPricing: (pricing) => {
+                if (!pricing) return { display: 'Pricing unavailable', needsFix: true };
+                
+                const totalAmount = pricing.totalAmount || 0;
+                const basePrice = pricing.basePrice || 0;
+                const platformFee = pricing.platformFee || 0;
+                const ownerAmount = pricing.ownerAmount || 0;
+                
+                if (totalAmount <= 0) {
+                    return {
+                        display: 'Pricing needs to be calculated',
+                        needsFix: true,
+                        breakdown: {
+                            basePrice: 0,
+                            platformFee: 0,
+                            ownerAmount: 0,
+                            totalAmount: 0
+                        }
+                    };
+                }
+                
+                return {
+                    display: `₹${totalAmount}`,
+                    needsFix: false,
+                    breakdown: {
+                        basePrice: basePrice,
+                        platformFee: platformFee,
+                        ownerAmount: ownerAmount,
+                        totalAmount: totalAmount
+                    }
+                };
+            }
+        };
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${type}`;
+        }
+
+        function testZeroPricingDetection() {
+            const testCases = [
+                { pricing: null, expected: true, description: 'Null pricing' },
+                { pricing: {}, expected: true, description: 'Empty pricing object' },
+                { pricing: { totalAmount: 0 }, expected: true, description: 'Zero total amount' },
+                { pricing: { totalAmount: -5 }, expected: true, description: 'Negative total amount' },
+                { pricing: { totalAmount: 100 }, expected: false, description: 'Valid total amount' },
+                { pricing: { totalAmount: 0.01 }, expected: false, description: 'Small positive amount' }
+            ];
+
+            let html = '<h4>Zero Pricing Detection Test Results:</h4><ul>';
+            let allPassed = true;
+
+            testCases.forEach((testCase, index) => {
+                const result = handleZeroPricing.isZeroPricing(testCase.pricing);
+                const passed = result === testCase.expected;
+                allPassed = allPassed && passed;
+                
+                html += `<li>
+                    <strong>Test ${index + 1}:</strong> ${testCase.description}<br>
+                    <strong>Result:</strong> ${result ? 'Zero pricing detected' : 'Valid pricing'}<br>
+                    <strong>Expected:</strong> ${testCase.expected ? 'Zero pricing detected' : 'Valid pricing'}<br>
+                    <strong>Status:</strong> ${passed ? '✅ PASSED' : '❌ FAILED'}
+                </li><br>`;
+            });
+
+            html += '</ul>';
+            html += `<p><strong>Overall Status:</strong> ${allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}</p>`;
+            
+            showResult('detectionResult', html, allPassed ? 'success' : 'error');
+        }
+
+        function testPricingDisplay() {
+            const testBookings = [
+                {
+                    id: 'booking1',
+                    pricing: null,
+                    description: 'Null pricing'
+                },
+                {
+                    id: 'booking2',
+                    pricing: { totalAmount: 0 },
+                    description: 'Zero pricing'
+                },
+                {
+                    id: 'booking3',
+                    pricing: { totalAmount: 1500, basePrice: 50, platformFee: 75, ownerAmount: 1425 },
+                    description: 'Valid pricing'
+                }
+            ];
+
+            let html = '<h4>Pricing Display Test Results:</h4>';
+            
+            testBookings.forEach(booking => {
+                const pricing = handleZeroPricing.formatPricing(booking.pricing);
+                const isZero = handleZeroPricing.isZeroPricing(booking.pricing);
+                
+                html += `<div class="pricing-display ${isZero ? 'zero-pricing' : 'valid-pricing'}">
+                    <h5>${booking.description}</h5>
+                    <p><strong>Display:</strong> ${pricing.display}</p>
+                    <p><strong>Needs Fix:</strong> ${pricing.needsFix ? 'Yes' : 'No'}</p>
+                    <p><strong>Is Zero Pricing:</strong> ${isZero ? 'Yes' : 'No'}</p>
+                    ${pricing.breakdown ? `
+                        <div><strong>Breakdown:</strong></div>
+                        <ul>
+                            <li>Base Price: ₹${pricing.breakdown.basePrice}</li>
+                            <li>Platform Fee: ₹${pricing.breakdown.platformFee}</li>
+                            <li>Owner Amount: ₹${pricing.breakdown.ownerAmount}</li>
+                            <li>Total Amount: ₹${pricing.breakdown.totalAmount}</li>
+                        </ul>
+                    ` : ''}
+                </div>`;
+            });
+
+            showResult('displayResult', html, 'info');
+        }
+
+        async function testFixPricingAPI() {
+            showResult('apiResult', '🔄 Testing fix pricing API...', 'info');
+            
+            try {
+                // Test with a mock booking ID
+                const mockBookingId = 'test-booking-id';
+                const mockToken = 'test-token';
+                
+                // This would normally call the real API
+                const response = await fetch(`/api/warehouse-bookings/${mockBookingId}/reconcile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${mockToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showResult('apiResult', `
+                        <h4>✅ API Test Successful</h4>
+                        <p><strong>Response:</strong></p>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `, 'success');
+                } else {
+                    showResult('apiResult', `
+                        <h4>⚠️ API Test - Expected Error</h4>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Message:</strong> This is expected since we're using a mock booking ID</p>
+                    `, 'warning');
+                }
+            } catch (error) {
+                showResult('apiResult', `
+                    <h4>⚠️ API Test - Network Error</h4>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>Note:</strong> This is expected if the backend is not running</p>
+                `, 'warning');
+            }
+        }
+
+        async function testRealBookingData() {
+            showResult('realDataResult', '🔄 Testing with real booking data...', 'info');
+            
+            try {
+                // Try to get real booking data
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    showResult('realDataResult', `
+                        <h4>⚠️ No Authentication Token</h4>
+                        <p>Please login to test with real booking data</p>
+                        <p>Token found in localStorage: ${token ? 'Yes' : 'No'}</p>
+                    `, 'warning');
+                    return;
+                }
+
+                const response = await fetch('/api/warehouse-bookings/my-bookings', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const bookings = result.data || [];
+                    
+                    let html = '<h4>Real Booking Data Test Results:</h4>';
+                    html += `<p><strong>Total Bookings:</strong> ${bookings.length}</p>`;
+                    
+                    const zeroPricingBookings = bookings.filter(booking => 
+                        handleZeroPricing.isZeroPricing(booking.pricing)
+                    );
+                    
+                    html += `<p><strong>Zero Pricing Bookings:</strong> ${zeroPricingBookings.length}</p>`;
+                    
+                    if (zeroPricingBookings.length > 0) {
+                        html += '<h5>Zero Pricing Bookings Found:</h5><ul>';
+                        zeroPricingBookings.forEach(booking => {
+                            html += `<li>
+                                <strong>ID:</strong> ${booking._id}<br>
+                                <strong>Warehouse:</strong> ${booking.warehouse?.name || 'Unknown'}<br>
+                                <strong>Current Price:</strong> ₹${booking.pricing?.totalAmount || 0}<br>
+                                <strong>Status:</strong> ${handleZeroPricing.getZeroPricingText(booking.pricing)}
+                            </li><br>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html += '<p>✅ No zero pricing bookings found!</p>';
+                    }
+                    
+                    showResult('realDataResult', html, zeroPricingBookings.length === 0 ? 'success' : 'warning');
+                } else {
+                    showResult('realDataResult', `
+                        <h4>❌ Failed to fetch bookings</h4>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Message:</strong> ${response.statusText}</p>
+                    `, 'error');
+                }
+            } catch (error) {
+                showResult('realDataResult', `
+                    <h4>❌ Error fetching real data</h4>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `, 'error');
+            }
+        }
+
+        // Auto-run detection test on load
+        window.onload = function() {
+            testZeroPricingDetection();
+        };
+    </script>
+</body>
+</html>

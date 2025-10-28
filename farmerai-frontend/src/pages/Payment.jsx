@@ -7,15 +7,20 @@ import { toast } from 'react-hot-toast';
 import { loadRazorpayScript, createRazorpayOrder, verifyPayment } from '../config/razorpay';
 import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { handleAuthError, refreshFirebaseToken, isAuthenticated } from '../utils/authUtils';
+import { handleZeroPricing, fixBookingPricing } from '../utils/pricingUtils';
+import AuthDebug from '../components/AuthDebug';
 
 const Payment = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth(); // Get user and loading state from AuthContext
+  const { user, loading: authLoading, refreshToken } = useAuth(); // Get user, loading state, and refreshToken from AuthContext
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending'); // pending, processing, success, failed
+  const [fixingPricing, setFixingPricing] = useState(false);
+  const [pricingError, setPricingError] = useState(null);
 
   useEffect(() => {
     console.log('🔍 Payment component mounted - Auth state:', {
@@ -39,16 +44,17 @@ const Payment = () => {
     try {
       setLoading(true);
       
-      // Ensure we have a valid token
-      const currentUser = auth.currentUser;
-      if (currentUser) {
+      // Try to refresh token using AuthContext if available
+      if (refreshToken) {
         try {
-          const freshToken = await currentUser.getIdToken(true);
-          localStorage.setItem('token', freshToken);
-          console.log('✅ Token refreshed for booking fetch');
+          await refreshToken();
+          console.log('✅ Token refreshed using AuthContext');
         } catch (tokenError) {
-          console.error('❌ Failed to refresh token:', tokenError);
+          console.error('❌ Failed to refresh token via AuthContext:', tokenError);
         }
+      } else {
+        // Fallback to manual token refresh
+        await refreshFirebaseToken();
       }
       
       const response = await apiClient.get(`/warehouse-bookings/${bookingId}`);
@@ -60,15 +66,51 @@ const Payment = () => {
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      if (error.response?.status === 401) {
-        toast.error('Authentication failed. Please login again.');
-        navigate('/login');
-      } else {
-        toast.error('Failed to fetch booking details');
-        navigate('/warehouses');
+      
+      // Use the utility function to handle auth errors
+      const wasAuthError = handleAuthError(error, navigate, '/my-bookings', {
+        customMessage: 'Your session has expired. Please login again to view your booking.'
+      });
+      
+      if (!wasAuthError) {
+        // Handle non-auth errors
+        toast.error('Failed to fetch booking details. Please try again.');
+        navigate('/my-bookings');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFixPricing = async () => {
+    try {
+      setFixingPricing(true);
+      setPricingError(null);
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        toast.error('Please login to fix pricing');
+        return;
+      }
+      
+      console.log('🔧 Fixing pricing for booking:', bookingId);
+      const result = await fixBookingPricing(bookingId, token);
+      
+      if (result.success) {
+        console.log('✅ Pricing fixed successfully:', result.data);
+        setBooking(result.data);
+        toast.success('Pricing fixed successfully!');
+      } else {
+        console.error('❌ Failed to fix pricing:', result.message);
+        setPricingError(result.message);
+        toast.error(result.message || 'Failed to fix pricing');
+      }
+    } catch (error) {
+      console.error('❌ Error fixing pricing:', error);
+      setPricingError(error.message);
+      toast.error('Error fixing pricing');
+    } finally {
+      setFixingPricing(false);
     }
   };
 
@@ -77,43 +119,69 @@ const Payment = () => {
       setProcessing(true);
       setPaymentStatus('processing');
 
-      // Check authentication - verify either user context OR token exists
-      const token = localStorage.getItem('token');
-      
-      if (!user && !token) {
-        console.error('❌ No authenticated user found');
-        toast.error('Please login to continue with payment');
-        navigate('/login');
+      // Wait for auth loading to complete, but don't block if we have a token
+      const hasToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (authLoading && !hasToken) {
+        console.log('⏳ Waiting for authentication to complete...');
+        toast.loading('Verifying authentication...');
         return;
       }
 
+      // Simplified authentication check
+      console.log('🔍 Debug authentication check:');
+      console.log('- User from context:', user);
+      console.log('- Auth loading:', authLoading);
+      console.log('- Firebase current user:', auth.currentUser);
+      console.log('- Token in localStorage:', localStorage.getItem('token'));
+      console.log('- Email in localStorage:', localStorage.getItem('email'));
+
+      // Check if user is authenticated using multiple methods
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const firebaseUser = auth.currentUser;
+      const email = localStorage.getItem('email');
+      const userFromContext = user;
+      
+      // User is considered authenticated if ANY of these are true
+      const isAuthenticated = !!(token || firebaseUser || email || userFromContext);
+      
+      console.log('- Authentication check result:', isAuthenticated);
+      console.log('- Token exists:', !!token);
+      console.log('- Firebase user exists:', !!firebaseUser);
+      console.log('- Email exists:', !!email);
+      console.log('- User from context exists:', !!userFromContext);
+
+      if (!isAuthenticated) {
+        console.error('❌ No authenticated user found');
+        console.log('🔍 Available auth data:');
+        console.log('  - localStorage token:', localStorage.getItem('token'));
+        console.log('  - sessionStorage token:', sessionStorage.getItem('token'));
+        console.log('  - localStorage email:', localStorage.getItem('email'));
+        console.log('  - Firebase user:', auth.currentUser);
+        console.log('  - Auth context user:', user);
+        toast.error('Please login to continue with payment');
+        navigate('/login', { state: { from: `/payment/${bookingId}` } });
+        return;
+      }
+
+      console.log('✅ Authentication verified, proceeding with payment...');
+
       console.log('🔄 Verifying authentication before payment...');
       console.log('User from context:', user ? 'Present' : 'Null');
-      console.log('Token in localStorage:', token ? 'Present' : 'Null');
+      console.log('Firebase user:', auth.currentUser ? 'Present' : 'Null');
       
-      const currentUser = auth.currentUser;
-      
-      // If Firebase user exists, refresh Firebase token
-      if (currentUser) {
+      // Try to refresh token using AuthContext if available
+      if (refreshToken) {
         try {
-          const freshToken = await currentUser.getIdToken(true); // Force refresh
-          localStorage.setItem('token', freshToken);
-          console.log('✅ Firebase token refreshed successfully');
+          await refreshToken();
+          console.log('✅ Token refreshed using AuthContext');
         } catch (tokenError) {
-          console.error('❌ Failed to refresh Firebase token:', tokenError);
-          toast.error('Authentication error. Please login again.');
-          navigate('/login');
-          return;
+          console.error('❌ Failed to refresh token via AuthContext:', tokenError);
+          // Fallback to manual refresh
+          await refreshFirebaseToken();
         }
-      } else if (token) {
-        // For JWT-based auth, token already exists
-        console.log('✅ Using existing JWT token for payment');
       } else {
-        // No auth method available
-        console.error('❌ No authentication method available');
-        toast.error('Please login to continue with payment');
-        navigate('/login');
-        return;
+        // Fallback to manual token refresh
+        await refreshFirebaseToken();
       }
 
       // Load Razorpay script
@@ -251,8 +319,22 @@ const Payment = () => {
     }).format(amount);
   };
 
+  // Show loading state while authentication is being verified
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Verifying Authentication</h2>
+          <p className="text-gray-600">Please wait while we verify your login status...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <AuthDebug />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -363,15 +445,51 @@ const Payment = () => {
                   <div className="border-t border-gray-200 pt-3">
                     <div className="flex justify-between text-lg font-semibold">
                       <span>Total Amount:</span>
-                      <span className="text-green-600">{formatCurrency(booking.pricing.totalAmount)}</span>
+                      {handleZeroPricing.isZeroPricing(booking.pricing) ? (
+                        <div className="flex flex-col items-end">
+                          <span className="text-red-600">₹0.00</span>
+                          <span className="text-xs text-red-500">Pricing needs to be calculated</span>
+                        </div>
+                      ) : (
+                        <span className="text-green-600">{formatCurrency(booking.pricing.totalAmount)}</span>
+                      )}
                     </div>
                   </div>
+                  
+                  {/* Zero Pricing Fix Button */}
+                  {handleZeroPricing.isZeroPricing(booking.pricing) && (
+                    <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-orange-800 font-medium">Pricing Issue Detected</p>
+                          <p className="text-orange-600 text-sm">The booking pricing needs to be recalculated</p>
+                        </div>
+                        <button
+                          onClick={handleFixPricing}
+                          disabled={fixingPricing}
+                          className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                        >
+                          {fixingPricing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Fixing...
+                            </>
+                          ) : (
+                            'Fix Pricing'
+                          )}
+                        </button>
+                      </div>
+                      {pricingError && (
+                        <p className="text-red-600 text-sm mt-2">{pricingError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Button */}
                 <button
                   onClick={handlePayment}
-                  disabled={processing || paymentStatus === 'success'}
+                  disabled={processing || paymentStatus === 'success' || authLoading || handleZeroPricing.isZeroPricing(booking.pricing)}
                   className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 >
                   {processing ? (
@@ -379,10 +497,20 @@ const Payment = () => {
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                       Processing...
                     </>
+                  ) : authLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Verifying Authentication...
+                    </>
                   ) : paymentStatus === 'success' ? (
                     <>
                       <CheckCircleIcon className="h-5 w-5 mr-2" />
                       Payment Successful
+                    </>
+                  ) : handleZeroPricing.isZeroPricing(booking.pricing) ? (
+                    <>
+                      <XCircleIcon className="h-5 w-5 mr-2" />
+                      Fix Pricing First
                     </>
                   ) : (
                     <>

@@ -17,8 +17,7 @@ export default function Register() {
     lastName: "", 
     email: "", 
     password: "", 
-    confirmPassword: "",
-    role: "farmer"
+    confirmPassword: ""
   });
   const [toast, setToast] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -193,8 +192,7 @@ export default function Register() {
         lastName: last,
         email: form.email,
         password: form.password || undefined,
-        confirmPassword: form.password ? form.confirmPassword : undefined,
-        role: form.role,
+        confirmPassword: form.password ? form.confirmPassword : undefined
       });
       if (res?.data?.success) {
         if (res?.data?.requiresVerification) {
@@ -224,9 +222,21 @@ export default function Register() {
       const u = await firebaseGoogleSignIn();
       // Auto-register on backend if needed
       try {
+        // Normalize names to meet validation requirements
+        let firstName = (u?.user?.displayName || '').split(' ')[0] || 'Farmer';
+        let lastName = (u?.user?.displayName || '').split(' ').slice(1).join(' ') || 'User';
+        
+        // Ensure names meet the validation requirements (only letters, min 2 chars)
+        firstName = firstName.replace(/[^A-Za-z]/g, '') || 'Farmer';
+        lastName = lastName.replace(/[^A-Za-z]/g, '') || 'User';
+        
+        // Ensure minimum length
+        if (firstName.length < 2) firstName = 'Farmer';
+        if (lastName.length < 2) lastName = 'User';
+        
         await apiClient.post('/auth/register', {
-          firstName: (u?.user?.displayName || '').split(' ')[0] || 'Farmer',
-          lastName: (u?.user?.displayName || '').split(' ').slice(1).join(' ') || 'User',
+          firstName,
+          lastName,
           email: u?.user?.email,
         });
       } catch (_) {
@@ -357,59 +367,6 @@ export default function Register() {
           </div>
           
           <div ref={el => fieldsRef.current[3] = el} style={{ opacity: 0 }}>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                I want to register as:
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  form.role === 'farmer' 
-                    ? 'border-green-500 bg-green-50' 
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}>
-                  <input
-                    type="radio"
-                    name="role"
-                    value="farmer"
-                    checked={form.role === 'farmer'}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center space-x-3">
-                    <div className="text-2xl">🌱</div>
-                    <div>
-                      <div className="font-medium text-gray-900">Farmer</div>
-                      <div className="text-sm text-gray-500">Book storage facilities</div>
-                    </div>
-                  </div>
-                </label>
-                
-                <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  form.role === 'warehouse-owner' 
-                    ? 'border-green-500 bg-green-50' 
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}>
-                  <input
-                    type="radio"
-                    name="role"
-                    value="warehouse-owner"
-                    checked={form.role === 'warehouse-owner'}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center space-x-3">
-                    <div className="text-2xl">🏪</div>
-                    <div>
-                      <div className="font-medium text-gray-900">Warehouse Owner</div>
-                      <div className="text-sm text-gray-500">List storage facilities</div>
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-          
-          <div ref={el => fieldsRef.current[4] = el} style={{ opacity: 0 }}>
             <PasswordField 
               label="Create Password" 
               placeholder="••••••••"
@@ -418,7 +375,7 @@ export default function Register() {
             />
           </div>
           
-          <div ref={el => fieldsRef.current[5] = el} style={{ opacity: 0 }}>
+          <div ref={el => fieldsRef.current[4] = el} style={{ opacity: 0 }}>
             <PasswordField 
               label="Confirm Password" 
               placeholder="••••••••"

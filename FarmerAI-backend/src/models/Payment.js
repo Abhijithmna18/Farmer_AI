@@ -35,8 +35,8 @@ const PaymentSchema = new mongoose.Schema(
       currency: { type: String, default: 'INR' }
     },
     razorpay: {
-      orderId: { type: String, required: true, index: true },
-      paymentId: { type: String, index: true },
+      orderId: { type: String, required: true },
+      paymentId: { type: String },
       signature: { type: String },
       status: {
         type: String,

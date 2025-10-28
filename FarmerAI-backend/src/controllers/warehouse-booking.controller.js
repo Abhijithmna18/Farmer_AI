@@ -34,6 +34,32 @@ const createBooking = async (req, res) => {
       });
     }
 
+    // Validate produce data
+    if (!produce.type || !produce.quantity || !produce.unit) {
+      return res.status(400).json({
+        success: false,
+        message: 'Produce must include type, quantity, and unit'
+      });
+    }
+
+    // Validate quantity is a positive number
+    const quantity = parseFloat(produce.quantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be a positive number'
+      });
+    }
+
+    // Validate unit is valid
+    const validUnits = ['kg', 'tons', 'quintals', 'bags', 'sqft', 'cubic_meters'];
+    if (!validUnits.includes(produce.unit)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid unit. Must be one of: ${validUnits.join(', ')}`
+      });
+    }
+
     // Get warehouse details
     const warehouse = await Warehouse.findById(warehouseId)
       .populate('owner', 'firstName lastName email phone warehouseOwnerProfile');
@@ -54,17 +80,47 @@ const createBooking = async (req, res) => {
     }
 
     // Check if user has enough capacity
-    if (warehouse.capacity.available < produce.quantity) {
+    if (warehouse.capacity.available < quantity) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient capacity. Available: ${warehouse.capacity.available} ${warehouse.capacity.unit}`
+        message: `Insufficient capacity. Available: ${warehouse.capacity.available} ${warehouse.capacity.unit}, Requested: ${quantity} ${produce.unit}`
       });
     }
 
-    // Calculate duration
+    // Validate warehouse pricing data
+    const pricingValidation = warehouse.validatePricing();
+    if (!pricingValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid warehouse pricing: ${pricingValidation.errors.join(', ')}`
+      });
+    }
+
+    // Calculate and validate duration
     const startDate = new Date(bookingDates.startDate);
     const endDate = new Date(bookingDates.endDate);
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Please provide valid start and end dates.'
+      });
+    }
+    
+    if (startDate >= endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be after start date.'
+      });
+    }
+    
     const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    if (duration <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duration must be at least 1 day.'
+      });
+    }
 
     // Validate minimum booking duration
     if (duration < warehouse.terms.minimumBookingDuration) {
@@ -74,11 +130,34 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // Calculate pricing
-    const basePrice = warehouse.pricing.basePrice;
-    const totalAmount = basePrice * duration * produce.quantity;
-    const platformFee = Math.round(totalAmount * 0.05); // 5% platform fee
-    const ownerAmount = totalAmount - platformFee;
+    // Quantity already validated above
+
+    // Calculate pricing using warehouse validation method
+    let totalAmount, basePrice, platformFee, ownerAmount;
+    try {
+      const priceCalculation = warehouse.calculatePrice(
+        bookingDates.startDate, 
+        bookingDates.endDate, 
+        quantity
+      );
+      
+      totalAmount = priceCalculation.totalAmount;
+      basePrice = priceCalculation.basePrice;
+      platformFee = Math.round(totalAmount * 0.05); // 5% platform fee
+      ownerAmount = totalAmount - platformFee;
+      
+      if (totalAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Calculated total amount must be greater than 0. Please check warehouse pricing.'
+        });
+      }
+    } catch (priceError) {
+      return res.status(400).json({
+        success: false,
+        message: `Pricing calculation failed: ${priceError.message}`
+      });
+    }
 
     // Create booking
     const booking = new Booking({
@@ -88,7 +167,7 @@ const createBooking = async (req, res) => {
       warehouseOwner: warehouse.owner._id,
       produce: {
         type: produce.type,
-        quantity: produce.quantity,
+        quantity: quantity, // Use validated quantity
         unit: produce.unit,
         quality: produce.quality || 'good',
         description: produce.description || '',

@@ -217,6 +217,7 @@ export const exportSensorDataCSV = async (hours = 24) => {
     
     return { success: true, message: 'Data exported successfully' };
   } catch (error) {
+    console.error('CSV export error:', error);
     // For network errors, we still want to return a consistent structure
     if (error.request && !error.response) {
       return {
@@ -224,6 +225,26 @@ export const exportSensorDataCSV = async (hours = 24) => {
         message: 'No response received from server. Check your network connection.',
         error: 'Network error or server is not running'
       };
+    }
+    // Handle case where we get a JSON error response instead of blob
+    if (error.response && error.response.data instanceof Blob) {
+      // Try to read the blob as text to get error message
+      const errorText = await error.response.data.text();
+      try {
+        const errorJson = JSON.parse(errorText);
+        return {
+          success: false,
+          message: errorJson.message || 'Failed to export CSV data',
+          error: errorJson.error || 'Export failed'
+        };
+      } catch (e) {
+        // If we can't parse as JSON, return the text as the message
+        return {
+          success: false,
+          message: errorText || 'Failed to export CSV data',
+          error: 'Export failed'
+        };
+      }
     }
     return handleAuthError(error, 'exportSensorDataCSV');
   }

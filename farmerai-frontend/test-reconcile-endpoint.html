@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reconcile Endpoint Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Reconcile Endpoint Test</h1>
+        <p>This tool tests the reconcile endpoint that fixes zero pricing issues.</p>
+        
+        <div class="test-section">
+            <h3>Step 1: Check Authentication</h3>
+            <button onclick="checkAuth()">Check Auth Status</button>
+            <div id="authResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Step 2: Find Bookings with Zero Pricing</h3>
+            <button onclick="findZeroPricingBookings()">Find Zero Pricing Bookings</button>
+            <div id="bookingsResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Step 3: Test Reconcile Endpoint</h3>
+            <input type="text" id="bookingId" placeholder="Enter booking ID" style="width: 300px; padding: 8px;">
+            <button onclick="testReconcile()">Test Reconcile</button>
+            <div id="reconcileResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Step 4: Fix All Zero Pricing Bookings</h3>
+            <button onclick="fixAllZeroPricing()">Fix All Zero Pricing</button>
+            <div id="fixAllResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${type}`;
+        }
+
+        async function checkAuth() {
+            const token = localStorage.getItem('token');
+            const email = localStorage.getItem('email');
+            
+            if (!token) {
+                showResult('authResult', '❌ No authentication token found. Please login first.', 'error');
+                return false;
+            }
+            
+            showResult('authResult', `✅ Authenticated as: ${email || 'Unknown'}<br>Token: ${token.substring(0, 20)}...`, 'success');
+            return true;
+        }
+
+        async function findZeroPricingBookings() {
+            try {
+                const response = await fetch('/api/warehouse-bookings/my-bookings', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const bookings = result.data || [];
+                    const zeroPricingBookings = bookings.filter(b => 
+                        !b.pricing?.totalAmount || b.pricing.totalAmount === 0
+                    );
+                    
+                    let html = `<h4>Found ${zeroPricingBookings.length} bookings with zero pricing:</h4>`;
+                    
+                    if (zeroPricingBookings.length === 0) {
+                        html += '<p>✅ No bookings with zero pricing found!</p>';
+                        showResult('bookingsResult', html, 'success');
+                    } else {
+                        html += '<ul>';
+                        zeroPricingBookings.forEach(booking => {
+                            html += `<li>
+                                <strong>ID:</strong> ${booking._id}<br>
+                                <strong>Warehouse:</strong> ${booking.warehouse?.name || 'Unknown'}<br>
+                                <strong>Current Price:</strong> ₹${booking.pricing?.totalAmount || 0}<br>
+                                <strong>Duration:</strong> ${booking.bookingDates?.duration || 'Unknown'} days<br>
+                                <strong>Quantity:</strong> ${booking.produce?.quantity || 0}<br>
+                                <strong>Base Price:</strong> ₹${booking.warehouse?.pricing?.basePrice || 0}
+                            </li><br>`;
+                        });
+                        html += '</ul>';
+                        showResult('bookingsResult', html, 'error');
+                    }
+                } else {
+                    showResult('bookingsResult', `❌ Failed to fetch bookings: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('bookingsResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testReconcile() {
+            const bookingId = document.getElementById('bookingId').value;
+            
+            if (!bookingId) {
+                showResult('reconcileResult', '❌ Please enter a booking ID', 'error');
+                return;
+            }
+            
+            try {
+                showResult('reconcileResult', '🔄 Testing reconcile endpoint...', 'info');
+                
+                const response = await fetch(`/api/warehouse-bookings/${bookingId}/reconcile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const booking = result.data;
+                    const pricing = booking.pricing;
+                    
+                    let html = `<h4>✅ Reconcile successful!</h4>`;
+                    html += `<p><strong>New Pricing Details:</strong></p>`;
+                    html += `<ul>`;
+                    html += `<li><strong>Base Price:</strong> ₹${pricing.basePrice}</li>`;
+                    html += `<li><strong>Total Amount:</strong> ₹${pricing.totalAmount}</li>`;
+                    html += `<li><strong>Platform Fee:</strong> ₹${pricing.platformFee}</li>`;
+                    html += `<li><strong>Owner Amount:</strong> ₹${pricing.ownerAmount}</li>`;
+                    html += `<li><strong>Currency:</strong> ${pricing.currency}</li>`;
+                    html += `</ul>`;
+                    
+                    // Show calculation breakdown
+                    const duration = booking.bookingDates?.duration || 0;
+                    const quantity = booking.produce?.quantity || 0;
+                    const basePrice = pricing.basePrice;
+                    
+                    html += `<p><strong>Calculation Breakdown:</strong></p>`;
+                    html += `<p>₹${basePrice} × ${duration} days × ${quantity} = ₹${basePrice * duration * quantity}</p>`;
+                    html += `<p>Platform Fee (5%): ₹${pricing.platformFee}</p>`;
+                    html += `<p>Total: ₹${pricing.totalAmount}</p>`;
+                    
+                    showResult('reconcileResult', html, 'success');
+                } else {
+                    showResult('reconcileResult', `❌ Reconcile failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('reconcileResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixAllZeroPricing() {
+            try {
+                showResult('fixAllResult', '🔄 Finding bookings with zero pricing...', 'info');
+                
+                // Get all bookings
+                const response = await fetch('/api/warehouse-bookings/my-bookings', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const bookings = result.data || [];
+                    const zeroPricingBookings = bookings.filter(b => 
+                        !b.pricing?.totalAmount || b.pricing.totalAmount === 0
+                    );
+                    
+                    if (zeroPricingBookings.length === 0) {
+                        showResult('fixAllResult', '✅ No bookings with zero pricing found!', 'success');
+                        return;
+                    }
+                    
+                    showResult('fixAllResult', `🔧 Fixing ${zeroPricingBookings.length} bookings...`, 'info');
+                    
+                    let fixedCount = 0;
+                    let failedCount = 0;
+                    
+                    for (const booking of zeroPricingBookings) {
+                        try {
+                            const fixResponse = await fetch(`/api/warehouse-bookings/${booking._id}/reconcile`, {
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            
+                            const fixResult = await fixResponse.json();
+                            
+                            if (fixResult.success) {
+                                fixedCount++;
+                                console.log(`✅ Fixed booking ${booking._id}: ₹${fixResult.data.pricing.totalAmount}`);
+                            } else {
+                                failedCount++;
+                                console.error(`❌ Failed to fix booking ${booking._id}:`, fixResult.message);
+                            }
+                        } catch (error) {
+                            failedCount++;
+                            console.error(`❌ Error fixing booking ${booking._id}:`, error);
+                        }
+                    }
+                    
+                    let html = `<h4>🎉 Fix Complete!</h4>`;
+                    html += `<p><strong>Results:</strong></p>`;
+                    html += `<ul>`;
+                    html += `<li>✅ Fixed: ${fixedCount} bookings</li>`;
+                    html += `<li>❌ Failed: ${failedCount} bookings</li>`;
+                    html += `</ul>`;
+                    
+                    if (fixedCount > 0) {
+                        html += `<p>🔄 Refreshing page in 3 seconds to show updated pricing...</p>`;
+                        setTimeout(() => window.location.reload(), 3000);
+                    }
+                    
+                    showResult('fixAllResult', html, fixedCount > 0 ? 'success' : 'error');
+                } else {
+                    showResult('fixAllResult', `❌ Failed to fetch bookings: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('fixAllResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-check auth on load
+        window.onload = function() {
+            checkAuth();
+        };
+    </script>
+</body>
+</html>

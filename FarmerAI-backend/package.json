@@ -40,7 +40,10 @@
     "razorpay": "^2.9.6",
     "socket.io": "^4.8.1",
     "undici": "^7.16.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "@tensorflow/tfjs-node": "^4.15.0",
+    "sharp": "^0.33.0",
+    "jimp": "^0.22.10"
   },
   "devDependencies": {
     "jest": "^30.0.5",

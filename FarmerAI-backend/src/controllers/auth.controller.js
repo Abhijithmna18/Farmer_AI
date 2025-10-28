@@ -71,17 +71,8 @@ exports.register = async (req, res, next) => {
     const otpCode = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Validate/map role
-    const roleMap = {
-      user: 'farmer',
-      owner: 'warehouse-owner',
-      farmer: 'farmer',
-      'warehouse-owner': 'warehouse-owner',
-      admin: 'farmer', // do not allow setting admin during signup
-    };
-    const mappedRole = role ? roleMap[role] : 'farmer';
-    const validRoles = ['farmer', 'warehouse-owner'];
-    const userRole = validRoles.includes(mappedRole) ? mappedRole : 'farmer';
+    // Set role to farmer for all new registrations
+    const userRole = 'farmer';
     
     const user = new User({
       firstName,

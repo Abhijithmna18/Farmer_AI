@@ -89,6 +89,14 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       console.error('🔒 Unauthorized - token may be expired or invalid');
       
+      // Prevent infinite retry loops
+      if (error.config._retry) {
+        console.log('🚫 Request already retried, not retrying again');
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        return Promise.reject(error);
+      }
+      
       // Try to refresh the token
       try {
         // Try to get a fresh token from Firebase if user is logged in
@@ -102,17 +110,15 @@ apiClient.interceptors.response.use(
           
           // Retry the original request with the new token
           const originalRequest = error.config;
+          originalRequest._retry = true; // Mark as retried
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           console.log('🔁 Retrying original request with refreshed token');
           return apiClient(originalRequest);
         } else {
-          // For admin login or other JWT tokens, try to refresh via backend
-          // This is a simplified approach - in a real app, you might have a refresh token endpoint
-          console.log('🧹 Clearing expired token and redirecting to login');
+          // For admin login or other JWT tokens, clear token
+          console.log('🧹 Clearing expired token');
           localStorage.removeItem('token');
           sessionStorage.removeItem('token');
-          // Optionally redirect to login page
-          // window.location.href = '/login';
         }
       } catch (refreshError) {
         console.error('❌ Failed to refresh token:', refreshError);
@@ -120,6 +126,12 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
       }
+    }
+    
+    // Handle 404 errors for warehouse bookings specifically
+    if (error.response?.status === 404 && error.config?.url?.includes('/warehouse-bookings/')) {
+      console.error('📦 Warehouse booking not found - may have been cancelled or deleted');
+      error.message = 'Booking not found. It may have been cancelled or deleted.';
     }
     
     return Promise.reject(error);

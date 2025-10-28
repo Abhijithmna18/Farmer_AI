@@ -3,7 +3,6 @@ import { onIdTokenChanged, getIdToken } from "firebase/auth"; // no getAuth here
 import { auth } from "../firebase"; // use exported auth instance
 import apiClient from "../services/apiClient"; // unified axios instance with baseURL + credentials
 import Toast from "../components/Toast";
-import { useTheme } from "./ThemeContext";
 
 export const AuthContext = createContext();
 
@@ -11,13 +10,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const themeCtx = (() => {
-    try {
-      return useTheme();
-    } catch (_) {
-      return null;
-    }
-  })();
 
   const logout = async () => {
     try {
@@ -75,6 +67,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
+      console.log('Firebase auth state changed:', u ? 'User logged in' : 'User logged out');
       setLoading(true);
       setError(null);
 
@@ -87,15 +80,15 @@ export function AuthProvider({ children }) {
           const res = await apiClient.get("/auth/me");
           const backendUser = res.data.user || { email: u.email };
           setUser(backendUser);
+          console.log('User profile loaded:', backendUser);
+          
           // Persist lightweight identity for refreshes and role-gated routes
           if (backendUser?.email) localStorage.setItem('email', backendUser.email);
           if (backendUser?.role) localStorage.setItem('role', backendUser.role);
           if (backendUser?.id || backendUser?._id) localStorage.setItem('userId', backendUser.id || backendUser._id);
-          // Sync theme preference on login if available
-          const preferredTheme = backendUser?.preferences?.theme;
-          if (preferredTheme && themeCtx?.setThemeMode) {
-            themeCtx.setThemeMode(preferredTheme, false);
-          }
+          
+          // Theme preference will be handled by ThemeProvider
+          // No need to set theme here to avoid circular dependency
         } catch (err) {
           console.error("Failed to fetch backend profile:", {
             message: err?.message,
@@ -111,14 +104,29 @@ export function AuthProvider({ children }) {
             localStorage.removeItem("email");
             setUser(null);
           } else {
-            // For other errors, still set the user with basic info
-            setUser({ email: u.email, role: localStorage.getItem('role') || undefined });
-            setError("Could not load full profile from server.");
+            // For other errors, still set the user with basic info from Firebase
+            const cachedRole = localStorage.getItem('role');
+            const userData = { 
+              email: u.email, 
+              role: cachedRole || undefined,
+              displayName: u.displayName,
+              photoURL: u.photoURL,
+              firstName: u.displayName?.split(' ')[0],
+              lastName: u.displayName?.split(' ').slice(1).join(' ')
+            };
+            setUser(userData);
+            console.log('Using Firebase user data due to backend error:', userData);
+            
+            // Only show error for non-network issues
+            if (err?.code !== 'NETWORK_ERROR' && err?.message !== 'Network Error') {
+              setError("Could not load full profile from server.");
+            }
           }
         } finally {
           setLoading(false);
         }
       } else {
+        console.log('No Firebase user, clearing auth data');
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("email");
@@ -132,44 +140,77 @@ export function AuthProvider({ children }) {
 
   // Bootstrap session from backend JWT (admin login) when no Firebase user
   useEffect(() => {
+    let isMounted = true;
+    let hasInitialized = false;
+    
     const initFromJwt = async () => {
-      // If already have a user from Firebase flow, skip
-      if (user) return;
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
+      // Prevent multiple initializations
+      if (hasInitialized) return;
+      hasInitialized = true;
+      
+      // Check if Firebase user exists first
+      if (auth.currentUser) {
+        console.log('Firebase user exists, skipping JWT initialization');
+        if (isMounted) setLoading(false);
         return;
       }
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        if (isMounted) setLoading(false);
+        return;
+      }
+      
       try {
-        setLoading(true);
+        if (isMounted) setLoading(true);
         const res = await apiClient.get('/auth/me');
-        if (res?.data?.user) {
+        if (res?.data?.user && isMounted) {
           const backendUser = res.data.user;
           setUser(backendUser);
           if (backendUser?.email) localStorage.setItem('email', backendUser.email);
           if (backendUser?.role) localStorage.setItem('role', backendUser.role);
           if (backendUser?.id || backendUser?._id) localStorage.setItem('userId', backendUser.id || backendUser._id);
-          const preferredTheme = backendUser?.preferences?.theme;
-          if (preferredTheme && themeCtx?.setThemeMode) {
-            themeCtx.setThemeMode(preferredTheme, false);
-          }
-        } else {
+          
+          // Set theme preference if available (moved to Firebase auth flow)
+          // Theme will be set when Firebase auth completes
+        } else if (isMounted) {
           // If backend returns no user but token exists, something is wrong, clear token
           localStorage.removeItem('token');
           setUser(null);
         }
       } catch (e) {
         console.error('Failed to initialize from JWT:', e);
-        // If token invalid, clear it
-        localStorage.removeItem('token');
-        // Removed localStorage.removeItem('role'); as role is part of user object
-        setUser(null);
+        
+        // Only clear token and logout if it's a 401 (unauthorized) error
+        if (e?.response?.status === 401) {
+          if (isMounted) {
+            localStorage.removeItem('token');
+            setUser(null);
+          }
+        } else {
+          // For other errors, keep the user data from localStorage if available
+          const email = localStorage.getItem('email');
+          const role = localStorage.getItem('role');
+          if (email && isMounted) {
+            setUser({ email, role: role || undefined });
+            console.log('Using cached user data due to network error');
+          }
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
-    initFromJwt();
-  }, [user, themeCtx?.setThemeMode, setUser]); // Add user and themeCtx.setThemeMode to dependencies
+    
+    // Add a small delay to let Firebase auth initialize first
+    const timeoutId = setTimeout(() => {
+      initFromJwt();
+    }, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, []); // Empty dependency array to run only once
 
   // Refresh user subscription status
   const refreshSubscriptionStatus = async () => {

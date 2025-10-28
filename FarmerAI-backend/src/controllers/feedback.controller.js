@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const Feedback = require('../models/Feedback');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -167,7 +168,13 @@ const getAllFeedback = async (req, res, next) => {
 
     statusCounts.forEach(item => {
       const status = item._id.toLowerCase().replace(' ', '');
-      counts[status] = item.count;
+      if (status === 'inprogress') {
+        counts.inProgress = item.count;
+      } else if (status === 'completed') {
+        counts.completed = item.count;
+      } else if (status === 'received') {
+        counts.received = item.count;
+      }
     });
 
     res.json({
@@ -336,6 +343,245 @@ const getFeedbackStats = async (req, res, next) => {
   }
 };
 
+// Get feedback analytics for user
+const getFeedbackAnalytics = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's feedback statistics
+    const totalFeedback = await Feedback.countDocuments({ userId });
+    const completedFeedback = await Feedback.countDocuments({ 
+      userId, 
+      status: 'Completed' 
+    });
+    const inProgressFeedback = await Feedback.countDocuments({ 
+      userId, 
+      status: 'In Progress' 
+    });
+    const receivedFeedback = await Feedback.countDocuments({ 
+      userId, 
+      status: 'Received' 
+    });
+
+    // Calculate average response time
+    const completedFeedbacks = await Feedback.find({ 
+      userId, 
+      status: 'Completed',
+      updatedAt: { $exists: true }
+    }).select('createdAt updatedAt');
+
+    let avgResponseTime = 0;
+    if (completedFeedbacks.length > 0) {
+      const totalResponseTime = completedFeedbacks.reduce((sum, feedback) => {
+        const responseTime = new Date(feedback.updatedAt) - new Date(feedback.createdAt);
+        return sum + responseTime;
+      }, 0);
+      avgResponseTime = Math.round(totalResponseTime / completedFeedbacks.length / (1000 * 60 * 60 * 24)); // Convert to days
+    }
+
+    // Get status distribution
+    const statusDistribution = await Feedback.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    // Get type distribution
+    const typeDistribution = await Feedback.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]);
+
+    // Get recent activity
+    const recentActivity = await Feedback.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('subject description status createdAt type');
+
+    res.json({
+      success: true,
+      analytics: {
+        totalFeedback,
+        completedFeedback,
+        inProgressFeedback,
+        receivedFeedback,
+        avgResponseTime,
+        satisfactionRate: completedFeedback > 0 ? Math.round((completedFeedback / totalFeedback) * 100) : 0,
+        statusDistribution,
+        typeDistribution,
+        recentActivity: recentActivity.map(activity => ({
+          subject: activity.subject,
+          description: activity.description.substring(0, 100) + '...',
+          status: activity.status,
+          type: activity.type,
+          date: activity.createdAt.toLocaleDateString()
+        }))
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching feedback analytics:', error);
+    next(error);
+  }
+};
+
+// Get feedback analytics for admin
+const getAdminFeedbackAnalytics = async (req, res, next) => {
+  try {
+    // Get overall statistics
+    const totalFeedback = await Feedback.countDocuments();
+    const completedFeedback = await Feedback.countDocuments({ status: 'Completed' });
+    const inProgressFeedback = await Feedback.countDocuments({ status: 'In Progress' });
+    const receivedFeedback = await Feedback.countDocuments({ status: 'Received' });
+
+    // Calculate average response time
+    const completedFeedbacks = await Feedback.find({ 
+      status: 'Completed',
+      updatedAt: { $exists: true }
+    }).select('createdAt updatedAt');
+
+    let avgResponseTime = 0;
+    if (completedFeedbacks.length > 0) {
+      const totalResponseTime = completedFeedbacks.reduce((sum, feedback) => {
+        const responseTime = new Date(feedback.updatedAt) - new Date(feedback.createdAt);
+        return sum + responseTime;
+      }, 0);
+      avgResponseTime = Math.round(totalResponseTime / completedFeedbacks.length / (1000 * 60 * 60 * 24)); // Convert to days
+    }
+
+    // Get status distribution
+    const statusDistribution = await Feedback.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    // Get type distribution
+    const typeDistribution = await Feedback.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]);
+
+    // Get active users (users who have submitted feedback)
+    const activeUsers = await Feedback.distinct('userId');
+
+    // Calculate resolution rate
+    const resolutionRate = totalFeedback > 0 ? Math.round((completedFeedback / totalFeedback) * 100) : 0;
+
+    res.json({
+      success: true,
+      analytics: {
+        totalFeedback,
+        completedFeedback,
+        inProgressFeedback,
+        receivedFeedback,
+        avgResponseTime,
+        satisfactionRate: 85, // Placeholder - would need user rating system
+        activeUsers: activeUsers.length,
+        resolutionRate,
+        statusDistribution,
+        typeDistribution
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching admin feedback analytics:', error);
+    next(error);
+  }
+};
+
+// Get feedback notifications for user
+const getFeedbackNotifications = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's recent feedback with status changes
+    const recentFeedback = await Feedback.find({ userId })
+      .sort({ updatedAt: -1 })
+      .limit(10)
+      .select('subject status adminComment updatedAt createdAt type priority');
+
+    // Generate mock notifications based on feedback status
+    const notifications = recentFeedback.map((feedback, index) => {
+      const isNew = new Date(feedback.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
+      const hasUpdate = new Date(feedback.updatedAt) > new Date(feedback.createdAt);
+      
+      let notification = {
+        id: `notification-${feedback._id}-${index}`,
+        type: 'status_update',
+        title: 'Feedback Update',
+        message: `Your feedback "${feedback.subject}" status has been updated to ${feedback.status}`,
+        feedbackSubject: feedback.subject,
+        priority: feedback.priority.toLowerCase(),
+        createdAt: feedback.updatedAt,
+        read: false
+      };
+
+      if (isNew) {
+        notification.type = 'response_received';
+        notification.title = 'New Feedback Submitted';
+        notification.message = `Your feedback "${feedback.subject}" has been received and is being reviewed`;
+        notification.createdAt = feedback.createdAt;
+      } else if (hasUpdate && feedback.adminComment) {
+        notification.type = 'response_received';
+        notification.title = 'Admin Response';
+        notification.message = `You have received a response for your feedback "${feedback.subject}"`;
+      }
+
+      return notification;
+    });
+
+    res.json({
+      success: true,
+      notifications
+    });
+  } catch (error) {
+    logger.error('Error fetching feedback notifications:', error);
+    next(error);
+  }
+};
+
+// Get feedback notifications for admin
+const getAdminFeedbackNotifications = async (req, res, next) => {
+  try {
+    // Get recent feedback that needs attention
+    const recentFeedback = await Feedback.find({ userId: { $exists: true, $ne: null } })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('userId', 'name email')
+      .select('subject status type priority createdAt userId');
+
+    // Generate mock notifications for admin
+    const notifications = recentFeedback.map((feedback, index) => {
+      const isNew = new Date(feedback.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
+      
+      // Handle case where userId might be null or not populated
+      const userName = feedback.userId?.name || feedback.userId?.email || 'Anonymous User';
+      
+      let notification = {
+        id: `admin-notification-${feedback._id}-${index}`,
+        type: 'new_feedback',
+        title: 'New Feedback Received',
+        message: `${userName} submitted a new ${feedback.type.toLowerCase()}: "${feedback.subject}"`,
+        feedbackSubject: feedback.subject,
+        priority: feedback.priority.toLowerCase(),
+        createdAt: feedback.createdAt,
+        read: false
+      };
+
+      if (feedback.status === 'Received' && feedback.priority === 'Critical') {
+        notification.type = 'urgent_feedback';
+        notification.title = 'Urgent Feedback';
+        notification.message = `Critical priority feedback from ${userName} requires immediate attention`;
+      }
+
+      return notification;
+    });
+
+    res.json({
+      success: true,
+      notifications
+    });
+  } catch (error) {
+    logger.error('Error fetching admin feedback notifications:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   createFeedback,
   getUserFeedback,
@@ -344,6 +590,10 @@ module.exports = {
   updateFeedback,
   deleteFeedback,
   getFeedbackStats,
+  getFeedbackAnalytics,
+  getAdminFeedbackAnalytics,
+  getFeedbackNotifications,
+  getAdminFeedbackNotifications,
   upload
 };
 

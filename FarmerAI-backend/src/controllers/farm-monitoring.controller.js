@@ -476,6 +476,7 @@ const exportSensorDataCSV = async (req, res) => {
 
   } catch (error) {
     logger.error('Error exporting sensor data as CSV:', error);
+    // Send error as JSON so frontend can properly handle it
     res.status(500).json({
       success: false,
       message: 'Failed to export sensor data',

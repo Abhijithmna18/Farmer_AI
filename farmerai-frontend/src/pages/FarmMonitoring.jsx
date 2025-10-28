@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer
+  Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 import { 
   Thermometer, Droplets, Sprout, RefreshCw, TrendingUp, 
@@ -26,7 +26,7 @@ import CustomAlertsManager from '../components/CustomAlertsManager';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function FarmMonitoring() {
-  const { refreshToken } = useContext(AuthContext);
+  const { refreshToken, refreshSubscriptionStatus } = useContext(AuthContext);
   const [latestData, setLatestData] = useState(null);
   const [historicalData, setHistoricalData] = useState([]);
   const [stats, setStats] = useState(null);
@@ -602,7 +602,18 @@ export default function FarmMonitoring() {
                 Refresh Session
               </button>
               <button
-                onClick={() => window.location.reload()}
+                onClick={async () => {
+                  try {
+                    // Try to refresh the user session first
+                    await refreshSubscriptionStatus();
+                    // Then refresh the data without full page reload
+                    await handleFetchNew();
+                  } catch (error) {
+                    console.error('Failed to refresh session:', error);
+                    // Only reload if refresh fails
+                    window.location.reload();
+                  }
+                }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl"
               >
                 Refresh Page
@@ -702,7 +713,7 @@ export default function FarmMonitoring() {
         </div>
         
         {lastUpdate && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Last updated: {lastUpdate.toLocaleTimeString()}
             {realTimeData && (
@@ -711,7 +722,7 @@ export default function FarmMonitoring() {
                 Live
               </span>
             )}
-          </p>
+          </div>
         )}
         
         {/* Connection error message */}

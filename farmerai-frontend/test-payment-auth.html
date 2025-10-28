@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Auth Test</title>
+</head>
+<body>
+    <h1>Payment Authentication Test</h1>
+    <div id="status"></div>
+    <button onclick="testAuth()">Test Authentication</button>
+    <button onclick="clearAuth()">Clear Authentication</button>
+    <button onclick="testPayment()">Test Payment Flow</button>
+    
+    <script>
+        function testAuth() {
+            const status = document.getElementById('status');
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('email');
+            
+            status.innerHTML = `
+                <h3>Authentication Status:</h3>
+                <p>Token: ${token ? 'Present' : 'Missing'}</p>
+                <p>User: ${user || 'Not found'}</p>
+                <p>Role: ${localStorage.getItem('role') || 'Not set'}</p>
+                <p>Timestamp: ${new Date().toLocaleString()}</p>
+            `;
+        }
+        
+        function clearAuth() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.getElementById('status').innerHTML = '<p>Authentication data cleared</p>';
+        }
+        
+        function testPayment() {
+            // Simulate the payment authentication check
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('email');
+            
+            if (!token && !user) {
+                alert('❌ No authenticated user found - This is the error you\'re seeing');
+                return;
+            }
+            
+            alert('✅ Authentication check passed');
+        }
+        
+        // Run test on load
+        testAuth();
+    </script>
+</body>
+</html>

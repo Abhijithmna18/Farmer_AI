@@ -39,7 +39,7 @@ const EventSchema = new mongoose.Schema(
 
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     category: { type: String, index: true },
-    tags: [{ type: String, index: true }],
+    tags: [{ type: String }],
     images: [imageSchema],
     attachments: [{ type: String }],
 
@@ -48,14 +48,56 @@ const EventSchema = new mongoose.Schema(
     price: { type: Number, default: 0 },
     recurrence: recurrenceSchema,
     reminders: [reminderSchema],
-    registrationLink: { type: String },
 
-    status: {
-      type: String,
-      enum: ['draft', 'pending', 'verified', 'published', 'cancelled', 'rejected', 'archived'],
-      default: 'pending',
-      index: true,
+    // Enhanced features
+    status: { 
+      type: String, 
+      enum: ['draft', 'published', 'cancelled', 'completed'], 
+      default: 'draft' 
     },
+    featured: { type: Boolean, default: false },
+    difficulty: { 
+      type: String, 
+      enum: ['beginner', 'intermediate', 'advanced'], 
+      default: 'beginner' 
+    },
+    language: { type: String, default: 'English' },
+    requirements: [{ type: String }], // What participants need to bring/prepare
+    learningOutcomes: [{ type: String }], // What participants will learn
+    materials: [{ type: String }], // Materials provided
+    
+    // Analytics
+    views: { type: Number, default: 0 },
+    registrations: { type: Number, default: 0 },
+    attendance: { type: Number, default: 0 },
+    rating: {
+      average: { type: Number, default: 0 },
+      count: { type: Number, default: 0 }
+    },
+    
+    // Social features
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    shares: { type: Number, default: 0 },
+    comments: [{ 
+      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      text: { type: String, required: true },
+      createdAt: { type: Date, default: Date.now }
+    }],
+    
+    // Event management
+    maxCapacity: { type: Number, default: 100 },
+    waitlistEnabled: { type: Boolean, default: false },
+    registrationDeadline: { type: Date },
+    cancellationPolicy: { type: String },
+    refundPolicy: { type: String },
+    
+    // Notifications
+    notificationSettings: {
+      reminder24h: { type: Boolean, default: true },
+      reminder1h: { type: Boolean, default: true },
+      updates: { type: Boolean, default: true }
+    },
+    registrationLink: { type: String },
     verificationToken: { type: String },
   },
   { timestamps: true }
@@ -65,5 +107,12 @@ EventSchema.index({ dateTime: 1 });
 EventSchema.index({ 'locationDetail.coordinates': '2dsphere' });
 EventSchema.index({ category: 1, status: 1 });
 EventSchema.index({ tags: 1 });
+EventSchema.index({ featured: 1, status: 1 });
+EventSchema.index({ difficulty: 1, status: 1 });
+EventSchema.index({ 'rating.average': -1 });
+EventSchema.index({ views: -1 });
+EventSchema.index({ registrations: -1 });
+EventSchema.index({ organizer: 1 });
+EventSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Event', EventSchema);

@@ -12,12 +12,18 @@ router.post('/', feedbackController.upload.single('attachment'), feedbackControl
 // Get user's own feedback (Farmer's view)
 router.get('/user', feedbackController.getUserFeedback);
 
-// Get single feedback by ID
+// User analytics and notifications (MUST come before /:id route)
+router.get('/analytics', feedbackController.getFeedbackAnalytics);
+router.get('/notifications', feedbackController.getFeedbackNotifications);
+
+// Get single feedback by ID (MUST come after specific routes)
 router.get('/:id', feedbackController.getFeedbackById);
 
 // Admin routes
 router.get('/admin/all', requireRole(['admin']), feedbackController.getAllFeedback);
 router.get('/admin/stats', requireRole(['admin']), feedbackController.getFeedbackStats);
+router.get('/admin/analytics', requireRole(['admin']), feedbackController.getAdminFeedbackAnalytics);
+router.get('/admin/notifications', requireRole(['admin']), feedbackController.getAdminFeedbackNotifications);
 router.put('/admin/:id', requireRole(['admin']), feedbackController.updateFeedback);
 router.delete('/admin/:id', requireRole(['admin']), feedbackController.deleteFeedback);
 
