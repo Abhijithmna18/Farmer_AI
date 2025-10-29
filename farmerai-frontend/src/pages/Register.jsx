@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from "react";
+import React, { useState, useRef, useLayoutEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { Leaf, Home } from "lucide-react";
 import InputField from "../components/InputField";
@@ -23,8 +23,109 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailValidating, setEmailValidating] = useState(false);
+  const [registeredEmails, setRegisteredEmails] = useState(new Set());
   const nav = useNavigate();
   
+  // Enhanced email validation
+  const validateEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+  };
+
+  // Check for common email typos and suggest corrections
+  const suggestEmailCorrection = (email) => {
+    const commonTypos = {
+      'gmail.co': 'gmail.com',
+      'gmial.com': 'gmail.com',
+      'gmail.cm': 'gmail.com',
+      'yahoo.co': 'yahoo.com',
+      'hotmail.co': 'hotmail.com',
+      'outlook.co': 'outlook.com'
+    };
+
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (domain && commonTypos[domain]) {
+      return email.replace(domain, commonTypos[domain]);
+    }
+    return null;
+  };
+
+  // Check if email is already registered (client-side check)
+  const isEmailRegistered = (email) => {
+    return registeredEmails.has(email.toLowerCase());
+  };
+
+  // Debounced email validation
+  const debouncedEmailCheck = useCallback(
+    (() => {
+      let timeoutId;
+      return (email) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          if (email && validateEmail(email)) {
+            if (isEmailRegistered(email)) {
+              setEmailError("This email is already registered");
+              return;
+            }
+            
+            // Check for common email patterns that might be already registered
+            const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+            const domain = email.split('@')[1]?.toLowerCase();
+            
+            if (commonDomains.includes(domain)) {
+              setEmailValidating(true);
+              // Simulate checking (in real app, you'd check against a local cache or API)
+              setTimeout(() => {
+                setEmailValidating(false);
+                // For demo purposes, we'll assume some emails are already registered
+                const demoRegisteredEmails = [
+                  'admin@farmerai.com',
+                  'test@example.com',
+                  'demo@gmail.com'
+                ];
+                
+                if (demoRegisteredEmails.includes(email.toLowerCase())) {
+                  setEmailError("This email is already registered");
+                  setRegisteredEmails(prev => new Set([...prev, email.toLowerCase()]));
+                }
+              }, 500);
+            }
+          }
+        }, 300);
+      };
+    })(),
+    []
+  );
+
+  // Handle email input change with validation
+  const handleEmailChange = (e) => {
+    const email = e.target.value;
+    setForm({ ...form, email });
+    setEmailError("");
+
+    if (email && !validateEmail(email)) {
+      const suggestion = suggestEmailCorrection(email);
+      if (suggestion) {
+        setEmailError(`Did you mean "${suggestion}"?`);
+      } else {
+        setEmailError("Please enter a valid email address");
+      }
+      return;
+    }
+
+    if (email && validateEmail(email)) {
+      if (isEmailRegistered(email)) {
+        setEmailError("This email is already registered");
+        return;
+      }
+      
+      // Trigger debounced check
+      debouncedEmailCheck(email);
+    }
+  };
+
   const formRef = useRef();
   const headlineRef = useRef();
   const subheadRef = useRef();
@@ -169,8 +270,20 @@ export default function Register() {
       setIsLoading(false);
       return;
     }
-    if (!emailValid(form.email)) {
-      setToast({ message: "Please enter a valid email", type: "error" });
+    if (!validateEmail(form.email)) {
+      setToast({ message: "Please enter a valid email address", type: "error" });
+      setIsLoading(false);
+      return;
+    }
+
+    if (isEmailRegistered(form.email)) {
+      setToast({ message: "This email is already registered", type: "error" });
+      setIsLoading(false);
+      return;
+    }
+
+    if (emailError) {
+      setToast({ message: emailError, type: "error" });
       setIsLoading(false);
       return;
     }
@@ -357,13 +470,48 @@ export default function Register() {
           </div>
           
           <div ref={el => fieldsRef.current[2] = el} style={{ opacity: 0 }}>
-            <InputField 
-              label="Email Address" 
-              type="email"
-              placeholder="you@yourfarm.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
+            <div className="relative">
+              <InputField 
+                label="Email Address" 
+                type="email"
+                placeholder="you@yourfarm.com"
+                value={form.email}
+                onChange={handleEmailChange}
+                className={emailError ? "border-red-500 focus:ring-red-500" : ""}
+              />
+              {emailValidating && (
+                <div className="absolute right-3 top-9 flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                </div>
+              )}
+              {emailError && (
+                <p className="text-red-500 text-sm mt-1 flex items-center">
+                  <span className="mr-1">⚠️</span>
+                  {emailError}
+                  {emailError.includes("Did you mean") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const suggestion = suggestEmailCorrection(form.email);
+                        if (suggestion) {
+                          setForm({ ...form, email: suggestion });
+                          setEmailError("");
+                        }
+                      }}
+                      className="ml-2 text-blue-500 hover:text-blue-700 underline"
+                    >
+                      Use suggestion
+                    </button>
+                  )}
+                </p>
+              )}
+              {form.email && !emailError && !emailValidating && validateEmail(form.email) && (
+                <p className="text-green-500 text-sm mt-1 flex items-center">
+                  <span className="mr-1">✓</span>
+                  Email looks good!
+                </p>
+              )}
+            </div>
           </div>
           
           <div ref={el => fieldsRef.current[3] = el} style={{ opacity: 0 }}>

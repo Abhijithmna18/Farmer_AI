@@ -100,7 +100,7 @@ const GrowthCalendarDetail = () => {
 
       <PageHeader 
         title={calendar.cropName}
-        subtitle={`Variety: ${calendar.variety || 'N/A'} | Planted on ${new Date(calendar.plantingDate).toLocaleDateString()}`}
+        subtitle={`Variety: ${calendar.variety || 'N/A'} | Planted on ${new Date(calendar.plantingDate).toLocaleDateString()}${calendar.transplantDate ? ` | Transplanted on ${new Date(calendar.transplantDate).toLocaleDateString()}` : ''}`}
       />
 
       {/* AI Suggestion Banner */}

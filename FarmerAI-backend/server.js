@@ -127,6 +127,7 @@ app.use('/api/warehouse-bookings', require('./src/routes/warehouse-booking.route
 app.use('/api/v2', require('./src/routes/warehouse-booking-v2.routes'));
 app.use('/api/razorpay', require('./src/routes/razorpay.routes'));
 app.use('/api/payments', require('./src/routes/payments.routes'));
+app.use('/api/upload', require('./src/routes/upload.routes'));
 app.use('/api/market', require('./src/routes/market.routes'));
 app.use('/api/test-razorpay', require('./src/routes/test-razorpay.routes'));
 app.use('/api/contact', require('./src/routes/contact.routes'));

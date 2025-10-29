@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import eventsService from '../services/eventsService';
-import { Calendar, MapPin, Clock, Users, RefreshCcw, Search, Download, Bookmark, Share2, Heart, Star, MessageCircle, TrendingUp, Filter, SortAsc } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, RefreshCcw, Search, Download, Bookmark, Share2, Heart, Star, MessageCircle, TrendingUp, Filter, SortAsc, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 export default function Events(){
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
@@ -264,7 +266,16 @@ export default function Events(){
   return (
     <div className="p-4 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-gray-900">Events</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-gray-900">Events</h2>
+          <button 
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors" 
+            onClick={() => navigate('/')}
+            title="Go to Home"
+          >
+            <Home className="w-4 h-4" /> Home
+          </button>
+        </div>
         <button className="flex items-center gap-2 px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" onClick={()=>load(1)}>
           <RefreshCcw className="w-4 h-4" /> Refresh
         </button>

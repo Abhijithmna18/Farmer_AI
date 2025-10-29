@@ -236,3 +236,4 @@ const PestDetection = () => {
 
 export default PestDetection;
 
+

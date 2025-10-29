@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Calendar, DollarSign, CheckCircle, AlertTriangle, Target } from 'lucide-react';
+import { Leaf, Calendar, DollarSign, CheckCircle, AlertTriangle, Target, Download, Share2, BookOpen, TrendingUp, BarChart3, MapPin, Clock, Zap, Info, Save, RefreshCw, Filter, Search, Eye, EyeOff } from 'lucide-react';
 
 const FertilizerRecommendation = () => {
   const [formData, setFormData] = useState({
@@ -18,10 +18,25 @@ const FertilizerRecommendation = () => {
   const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [savedRecommendations, setSavedRecommendations] = useState([]);
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonData, setComparisonData] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [showCharts, setShowCharts] = useState(false);
 
-  const cropTypes = ['Rice', 'Wheat', 'Maize', 'Tomato', 'Potato', 'Sugarcane', 'Cotton'];
-  const soilTypes = ['Sandy', 'Loamy', 'Clay', 'Silty'];
-  const previousCrops = ['Rice', 'Wheat', 'Maize', 'Tomato', 'Potato', 'Legumes', 'None'];
+  const cropTypes = [
+    'Rice', 'Wheat', 'Maize', 'Tomato', 'Potato', 'Sugarcane', 'Cotton',
+    'Soybean', 'Groundnut', 'Sunflower', 'Mustard', 'Chickpea', 'Lentil',
+    'Onion', 'Chili', 'Brinjal', 'Cabbage', 'Cauliflower', 'Carrot',
+    'Mango', 'Banana', 'Citrus', 'Grapes', 'Pomegranate', 'Papaya'
+  ];
+  const soilTypes = ['Sandy', 'Loamy', 'Clay', 'Silty', 'Sandy Loam', 'Clay Loam', 'Silty Loam', 'Peaty', 'Chalky'];
+  const previousCrops = ['Rice', 'Wheat', 'Maize', 'Tomato', 'Potato', 'Legumes', 'Sugarcane', 'Cotton', 'None'];
+  const applicationMethods = ['Broadcast', 'Band Placement', 'Side Dressing', 'Foliar Spray', 'Drip Irrigation', 'Fertigation'];
+  const timingOptions = ['Pre-planting', 'At Planting', 'Side Dressing', 'Top Dressing', 'Post Harvest'];
 
   useEffect(() => {
     // Load recommendation history
@@ -113,6 +128,67 @@ const FertilizerRecommendation = () => {
       [name]: value
     }));
   };
+
+  // Save recommendation
+  const saveRecommendation = () => {
+    if (recommendation) {
+      const savedRec = {
+        ...recommendation,
+        id: Date.now(),
+        savedAt: new Date().toISOString(),
+        name: `${formData.cropType} - ${formData.farmId}`
+      };
+      setSavedRecommendations(prev => [savedRec, ...prev]);
+    }
+  };
+
+  // Export recommendation as PDF
+  const exportRecommendation = () => {
+    if (recommendation) {
+      const data = {
+        ...recommendation,
+        formData,
+        exportDate: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fertilizer-recommendation-${formData.farmId}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // Share recommendation
+  const shareRecommendation = async () => {
+    if (navigator.share && recommendation) {
+      try {
+        await navigator.share({
+          title: 'Fertilizer Recommendation',
+          text: `Fertilizer recommendation for ${formData.cropType} - Total Cost: ₹${recommendation.totalCost}`,
+          url: window.location.href
+        });
+      } catch (err) {
+        console.log('Error sharing:', err);
+      }
+    }
+  };
+
+  // Compare recommendations
+  const compareRecommendations = () => {
+    const selected = savedRecommendations.filter(rec => rec.selected);
+    setComparisonData(selected);
+    setShowComparison(true);
+  };
+
+  // Filter and search functions
+  const filteredHistory = history.filter(item => {
+    const matchesSearch = item.cropType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.soilType.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || item.status.toLowerCase() === filterStatus.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
 
   // Enhanced mock data generator based on soil and crop conditions
   const generateMockRecommendation = (formData) => {
@@ -460,13 +536,71 @@ const FertilizerRecommendation = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Leaf className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fertilizer Recommendation</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Leaf className="w-8 h-8 text-blue-600" />
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fertilizer Recommendation</h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                  AI-powered fertilizer recommendations using decision tree classification
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCharts(!showCharts)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <BarChart3 className="w-4 h-4" />
+                {showCharts ? 'Hide Charts' : 'Show Charts'}
+              </button>
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                <Zap className="w-4 h-4" />
+                {showAdvanced ? 'Basic Mode' : 'Advanced Mode'}
+              </button>
+            </div>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
-            Get AI-powered fertilizer recommendations using decision tree classification
-          </p>
+          
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Total Recommendations</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{history.length}</p>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span className="text-sm font-medium text-green-800 dark:text-green-200">Applied</span>
+              </div>
+              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                {history.filter(h => h.status === 'Applied').length}
+              </p>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Pending</span>
+              </div>
+              <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
+                {history.filter(h => h.status === 'Pending').length}
+              </p>
+            </div>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
+                <span className="text-sm font-medium text-purple-800 dark:text-purple-200">Avg Yield Increase</span>
+              </div>
+              <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                +{Math.round(history.reduce((sum, h) => sum + h.yieldIncrease, 0) / history.length || 0)}%
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -666,7 +800,34 @@ const FertilizerRecommendation = () => {
 
           {/* Results */}
           <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Recommendation Results</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recommendation Results</h2>
+              {recommendation && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={saveRecommendation}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save
+                  </button>
+                  <button
+                    onClick={exportRecommendation}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={shareRecommendation}
+                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share
+                  </button>
+                </div>
+              )}
+            </div>
             
             {loading ? (
               <div className="text-center py-8">
@@ -828,9 +989,44 @@ const FertilizerRecommendation = () => {
 
         {/* Recommendation History */}
         <div className="mt-8 bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Recent Recommendations</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Recommendations</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={compareRecommendations}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Compare
+              </button>
+            </div>
+          </div>
+
+          {/* Search and Filter */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by crop or soil type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            >
+              <option value="all">All Status</option>
+              <option value="applied">Applied</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {history.map((item) => (
+            {filteredHistory.map((item) => (
               <div key={item.id} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-gray-900 dark:text-white">{item.cropType}</h3>
@@ -856,6 +1052,94 @@ const FertilizerRecommendation = () => {
             ))}
           </div>
         </div>
+
+        {/* Comparison Modal */}
+        {showComparison && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Compare Recommendations</h3>
+                <button
+                  onClick={() => setShowComparison(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {comparisonData.map((rec, index) => (
+                  <div key={index} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">{rec.name}</h4>
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Total Cost:</span> ₹{rec.totalCost}</p>
+                      <p><span className="font-medium">Confidence:</span> {rec.confidence}%</p>
+                      <p><span className="font-medium">Yield Increase:</span> +{rec.expectedYieldIncrease}%</p>
+                      <p><span className="font-medium">Recommendations:</span> {rec.summary.totalRecommendations}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Charts Section */}
+        {showCharts && (
+          <div className="mt-8 bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Analytics & Insights</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cost Analysis Chart */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-4">Cost Analysis</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-blue-700 dark:text-blue-300">Average Cost</span>
+                    <span className="font-bold text-blue-900 dark:text-blue-100">
+                      ₹{Math.round(history.reduce((sum, h) => sum + h.totalCost, 0) / history.length || 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-blue-700 dark:text-blue-300">Highest Cost</span>
+                    <span className="font-bold text-blue-900 dark:text-blue-100">
+                      ₹{Math.max(...history.map(h => h.totalCost), 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-blue-700 dark:text-blue-300">Lowest Cost</span>
+                    <span className="font-bold text-blue-900 dark:text-blue-100">
+                      ₹{Math.min(...history.map(h => h.totalCost), 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Yield Analysis Chart */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4">
+                <h3 className="font-semibold text-green-900 dark:text-green-100 mb-4">Yield Analysis</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-green-700 dark:text-green-300">Average Increase</span>
+                    <span className="font-bold text-green-900 dark:text-green-100">
+                      +{Math.round(history.reduce((sum, h) => sum + h.yieldIncrease, 0) / history.length || 0)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-green-700 dark:text-green-300">Best Performance</span>
+                    <span className="font-bold text-green-900 dark:text-green-100">
+                      +{Math.max(...history.map(h => h.yieldIncrease), 0)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-green-700 dark:text-green-300">Success Rate</span>
+                    <span className="font-bold text-green-900 dark:text-green-100">
+                      {Math.round((history.filter(h => h.status === 'Applied').length / history.length) * 100 || 0)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

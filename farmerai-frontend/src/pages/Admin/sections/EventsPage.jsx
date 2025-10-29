@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { Plus, Search, Calendar as CalIcon, MapPin, Clock, Edit, Trash2, Download } from 'lucide-react';
+import { Plus, Search, Calendar as CalIcon, MapPin, Clock, Edit, Trash2, Download, Image as ImageIcon, Star, Users, X } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
 import EventForm from '../../../components/admin/EventForm';
+import UpcomingEventsManager from '../../../components/admin/UpcomingEventsManager';
 import * as XLSX from 'xlsx';
 
 export default function EventsPage(){
+  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'upcoming'
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -101,26 +103,51 @@ export default function EventsPage(){
           <h1 className="text-2xl font-bold text-gray-900">Events Management</h1>
           <p className="text-gray-600">Create, edit, and manage public events</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-            <Plus className="w-4 h-4" /> Add Event
-          </button>
-        </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
-        <Search className="w-5 h-5 text-gray-400" />
-        <input
-          value={search}
-          onChange={(e)=>{ setPage(1); setSearch(e.target.value); }}
-          placeholder="Search by title or location..."
-          className="flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-green-500"
-        />
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'all'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            All Events
+          </button>
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'upcoming'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <CalIcon className="w-4 h-4" />
+              Upcoming Events
+              <ImageIcon className="w-4 h-4" />
+            </div>
+          </button>
+        </nav>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'all' ? (
+        <>
+          {/* Search */}
+          <div className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
+            <Search className="w-5 h-5 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e)=>{ setPage(1); setSearch(e.target.value); }}
+              placeholder="Search by title or location..."
+              className="flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-green-500"
+            />
+          </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -189,6 +216,10 @@ export default function EventsPage(){
           </motion.div>
         )}
       </AnimatePresence>
+        </>
+      ) : (
+        <UpcomingEventsManager />
+      )}
     </div>
   );
 }

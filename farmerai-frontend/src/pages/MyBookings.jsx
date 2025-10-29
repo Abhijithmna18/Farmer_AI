@@ -66,9 +66,7 @@ const MyBookings = () => {
     try {
       setLoading(true);
       console.log('Fetching bookings...');
-      const response = await apiClient.get('/warehouse-bookings/my-bookings', {
-        headers: lastFetchedAt ? { 'If-Modified-Since': new Date(lastFetchedAt).toUTCString() } : {}
-      });
+      const response = await apiClient.get('/warehouse-bookings/my-bookings');
       console.log('Bookings response:', response.data);
       
       if (response.data.success) {
@@ -427,9 +425,7 @@ const MyBookings = () => {
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-500">Booked on {created}{updated ? ` • Last updated ${updated}` : ''}</div>
             <div className="flex space-x-2">
-              {booking.status === 'pending' && (
-                <button onClick={() => onCancel?.(booking._id)} className="px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors" aria-label="Cancel booking">Cancel Booking</button>
-              )}
+              {/* Cancel Booking removed as per requirements */}
               {canModify && (
                 <button onClick={() => onModify?.(booking._id, booking.warehouse?._id)} className="px-4 py-2 text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors" aria-label="Modify booking">Modify Booking</button>
               )}
@@ -536,32 +532,7 @@ const MyBookings = () => {
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="mb-6" role="tablist" aria-label="Booking filters">
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
-            {[
-              { key: 'all', label: 'All Bookings', count: bookings.length },
-              { key: 'pending', label: 'Pending', count: bookings.filter(b => b.status === 'pending').length },
-              { key: 'approved', label: 'Approved', count: bookings.filter(b => b.status === 'approved').length },
-              { key: 'rejected', label: 'Rejected', count: bookings.filter(b => b.status === 'rejected').length },
-              { key: 'cancelled', label: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                role="tab"
-                aria-selected={filter === tab.key}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filter === tab.key
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {tab.label} ({tab.count})
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Filter Tabs removed as per requirements */}
 
         {/* Error State */}
         {error && (
@@ -703,15 +674,7 @@ const MyBookings = () => {
                       Booked on {formatDate(booking.createdAt)}
                     </div>
                     <div className="flex space-x-2">
-                      {booking.status === 'pending' && (
-                        <button
-                          onClick={() => handleCancelBooking(booking._id)}
-                          className="px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                          aria-label="Cancel booking"
-                        >
-                          Cancel Booking
-                        </button>
-                      )}
+                      {/* Cancel Booking removed as per requirements */}
                       {/* Modify button for active future bookings */}
                       {(['approved','pending'].includes(booking.status) && new Date(booking.startDate).getTime() > now) && (
                         <button

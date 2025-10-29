@@ -31,11 +31,39 @@ const CreateGrowthCalendar = () => {
     setFormData({ ...formData, [name]: value });
   };
 
+  // Prevent spacebar entry for text inputs
+  const handleKeyDown = (e) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+    }
+  };
+
+  // Handle input change with spacebar validation
+  const handleInputChangeWithValidation = (e) => {
+    const { name, value } = e.target;
+    // Remove any spaces that might have been entered
+    const cleanValue = value.replace(/\s/g, '');
+    setFormData({ ...formData, [name]: cleanValue });
+  };
+
   const handleStageChange = (index, e) => {
     const { name, value } = e.target;
     const stages = [...formData.stages];
-    stages[index][name] = value;
+    // Remove spaces for text fields (not for description fields)
+    const cleanValue = (name === 'stageName' || name === 'careNeeds' || name === 'nutrientRequirements') 
+      ? value.replace(/\s/g, '') 
+      : value;
+    stages[index][name] = cleanValue;
     setFormData({ ...formData, stages });
+  };
+
+  // Handle stage input key down to prevent spacebar
+  const handleStageKeyDown = (e) => {
+    const { name } = e.target;
+    // Only prevent spacebar for specific fields, allow it for description
+    if ((name === 'stageName' || name === 'careNeeds' || name === 'nutrientRequirements') && e.key === ' ') {
+      e.preventDefault();
+    }
   };
 
   const addStage = () => {
@@ -155,14 +183,16 @@ const CreateGrowthCalendar = () => {
           label="Crop Name"
           name="cropName"
           value={formData.cropName}
-          onChange={handleInputChange}
+          onChange={handleInputChangeWithValidation}
+          onKeyDown={handleKeyDown}
           required
         />
         <InputField
           label="Variety (Optional)"
           name="variety"
           value={formData.variety}
-          onChange={handleInputChange}
+          onChange={handleInputChangeWithValidation}
+          onKeyDown={handleKeyDown}
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {calendarSystem === 'gregorian' ? (
@@ -219,7 +249,8 @@ const CreateGrowthCalendar = () => {
           label="Regional Climate (e.g., Temperate, Tropical)"
           name="regionalClimate"
           value={formData.regionalClimate}
-          onChange={handleInputChange}
+          onChange={handleInputChangeWithValidation}
+          onKeyDown={handleKeyDown}
         />
 
         <div className="space-y-4">
@@ -276,6 +307,7 @@ const CreateGrowthCalendar = () => {
                 name="careNeeds"
                 value={stage.careNeeds || ''}
                 onChange={(e) => handleStageChange(index, e)}
+                onKeyDown={handleStageKeyDown}
                 placeholder="e.g., Regular watering and pruning"
               />
               <InputField
@@ -283,6 +315,7 @@ const CreateGrowthCalendar = () => {
                 name="nutrientRequirements"
                 value={stage.nutrientRequirements || ''}
                 onChange={(e) => handleStageChange(index, e)}
+                onKeyDown={handleStageKeyDown}
                 placeholder="e.g., NPK 10-10-10"
               />
               <button

@@ -447,8 +447,15 @@ export default function Dashboard() {
                   const firstStage = cal.stages?.[0];
                   const stageName = firstStage?.stageName || '—';
                   const sowing = cal.plantingDate ? new Date(cal.plantingDate).toLocaleDateString() : '—';
-                  const transplant = cal.stages?.find(s => s.stageName?.toLowerCase() === 'seedling')?.startDate;
-                  const transplantDate = transplant ? new Date(transplant).toLocaleDateString() : '—';
+                  // Check for transplant date from multiple sources (robust)
+                  const stageForTransplant = cal.stages?.find((s) => {
+                    const n = (s?.stageName || '').toLowerCase().trim();
+                    return n.includes('transplant') || n === 'seedling';
+                  });
+                  const transplantFromStages = stageForTransplant?.startDate || stageForTransplant?.endDate;
+                  const transplantFromField = cal.transplantDate || cal.transplantingDate;
+                  const transplantRaw = transplantFromField || transplantFromStages;
+                  const transplantDate = (transplantRaw && !isNaN(new Date(transplantRaw))) ? new Date(transplantRaw).toLocaleDateString() : '—';
                   const harvest = cal.estimatedHarvestDate || cal.stages?.slice(-1)?.[0]?.endDate;
                   const harvestDate = harvest ? new Date(harvest).toLocaleDateString() : '—';
 

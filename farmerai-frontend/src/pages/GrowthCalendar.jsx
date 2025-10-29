@@ -96,6 +96,23 @@ const GrowthCalendar = () => {
                       })()
                     )}
                   </p>
+                  {calendar.transplantDate && (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {calendarSystem === 'gregorian' ? (
+                        <span>
+                          Transplant: {new Date(calendar.transplantDate).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        (()=>{
+                          try {
+                            const ml = toMalayalam(calendar.transplantDate);
+                            const title = new Date(calendar.transplantDate).toLocaleDateString();
+                            return <span title={`Gregorian: ${title}`}>Transplant (Malayalam): {ml ? `${ml.month} ${ml.day}, ${ml.year}` : '—'}</span>;
+                          } catch { return <span>Transplant (Malayalam): —</span>; }
+                        })()
+                      )}
+                    </p>
+                  )}
                   <p className="text-gray-600 dark:text-gray-300">
                     {calendarSystem === 'gregorian' ? (
                       <span>

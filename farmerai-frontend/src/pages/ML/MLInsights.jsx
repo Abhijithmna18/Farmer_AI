@@ -47,30 +47,6 @@ const MLInsights = () => {
       description: 'Smart fertilizer recommendations using decision tree classification',
       color: 'bg-blue-500',
       href: '/ml/fertilizer'
-    },
-    {
-      title: 'Irrigation AI',
-      icon: Droplets,
-      count: insights.irrigationOptimizations,
-      description: 'Smart water management optimization',
-      color: 'bg-blue-500',
-      href: '/ml/irrigation'
-    },
-    {
-      title: 'Health Monitor',
-      icon: Shield,
-      count: insights.healthScores,
-      description: 'Crop health monitoring and analysis',
-      color: 'bg-green-500',
-      href: '/ml/health'
-    },
-    {
-      title: 'Price Prediction',
-      icon: TrendingUp,
-      count: insights.priceForecasts,
-      description: 'Market price forecasting and trends',
-      color: 'bg-purple-500',
-      href: '/ml/pricing'
     }
   ];
 

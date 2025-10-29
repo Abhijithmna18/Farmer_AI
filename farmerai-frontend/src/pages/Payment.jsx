@@ -9,7 +9,7 @@ import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { handleAuthError, refreshFirebaseToken, isAuthenticated } from '../utils/authUtils';
 import { handleZeroPricing, fixBookingPricing } from '../utils/pricingUtils';
-import AuthDebug from '../components/AuthDebug';
+// AuthDebug removed for production UI
 
 const Payment = () => {
   const { bookingId } = useParams();
@@ -334,7 +334,6 @@ const Payment = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AuthDebug />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}

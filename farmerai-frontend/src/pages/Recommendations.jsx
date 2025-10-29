@@ -47,6 +47,13 @@ export default function Recommendations() {
 
   useEffect(() => { gsap.fromTo('.rec-card', { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.06, duration: 0.5 }); }, [items.length]);
 
+  // Prevent entering spacebar or submitting via Enter in numeric fields
+  const handleBlockSpaceEnter = (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+    }
+  };
+
   // Enhanced mock data generator for crop recommendations
   const generateEnhancedMockRecommendations = (soilType, season, location) => {
     const cropDatabase = {
@@ -615,27 +622,32 @@ export default function Recommendations() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div>
             <label className="text-sm text-gray-600">Nitrogen (N)</label>
-            <input value={N} onChange={e=>setN(e.target.value.replace(/[^\d.]/g,''))} className="w-full border rounded px-3 py-2" placeholder="e.g., 40" />
+            <input value={N} onChange={e=>setN(e.target.value.replace(/[^\d.]/g,''))} onKeyDown={handleBlockSpaceEnter} className="w-full border rounded px-3 py-2" placeholder="e.g., 40" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Phosphorus (P)</label>
-            <input value={P} onChange={e=>setP(e.target.value.replace(/[^\d.]/g,''))} className="w-full border rounded px-3 py-2" placeholder="e.g., 20" />
+            <input value={P} onChange={e=>setP(e.target.value.replace(/[^\d.]/g,''))} onKeyDown={handleBlockSpaceEnter} className="w-full border rounded px-3 py-2" placeholder="e.g., 20" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Potassium (K)</label>
-            <input value={K} onChange={e=>setK(e.target.value.replace(/[^\d.]/g,''))} className="w-full border rounded px-3 py-2" placeholder="e.g., 30" />
+            <input value={K} onChange={e=>setK(e.target.value.replace(/[^\d.]/g,''))} onKeyDown={handleBlockSpaceEnter} className="w-full border rounded px-3 py-2" placeholder="e.g., 30" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Rainfall (mm)</label>
-            <input value={rainfall} onChange={e=>setRainfall(e.target.value.replace(/[^\d.]/g,''))} className="w-full border rounded px-3 py-2" placeholder="e.g., 120" />
+            <input value={rainfall} onChange={e=>setRainfall(e.target.value.replace(/[^\d.]/g,''))} onKeyDown={handleBlockSpaceEnter} className="w-full border rounded px-3 py-2" placeholder="e.g., 120" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Humidity (%)</label>
-            <input value={humidity} onChange={e=>setHumidity(e.target.value.replace(/[^\d.]/g,''))} className="w-full border rounded px-3 py-2" placeholder="e.g., 70" />
+            <input value={humidity} onChange={e=>setHumidity(e.target.value.replace(/[^\d.]/g,''))} onKeyDown={handleBlockSpaceEnter} className="w-full border rounded px-3 py-2" placeholder="e.g., 70" />
           </div>
         </div>
         <div className="mt-3">
           <button onClick={async ()=>{
+            const values = [N, P, K, rainfall, humidity];
+            if (values.some(v => String(v).trim() === '')) {
+              toast.error('Please enter all soil inputs (no spaces/empty).');
+              return;
+            }
             try {
               const res = await getSoilRecommendations({ N:Number(N), P:Number(P), K:Number(K), rainfall:Number(rainfall), humidity:Number(humidity) });
               const doc = res?.data;
@@ -939,11 +951,11 @@ export default function Recommendations() {
           <div className="mt-3 p-3 border rounded-lg bg-gray-50">
             <div className="font-medium mb-2">Edit Soil Inputs</div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              <input className="border rounded px-2 py-1" value={editForm.N} onChange={e=>setEditForm(f=>({...f,N:e.target.value.replace(/[^\d.]/g,'')}))} placeholder="N" />
-              <input className="border rounded px-2 py-1" value={editForm.P} onChange={e=>setEditForm(f=>({...f,P:e.target.value.replace(/[^\d.]/g,'')}))} placeholder="P" />
-              <input className="border rounded px-2 py-1" value={editForm.K} onChange={e=>setEditForm(f=>({...f,K:e.target.value.replace(/[^\d.]/g,'')}))} placeholder="K" />
-              <input className="border rounded px-2 py-1" value={editForm.rainfall} onChange={e=>setEditForm(f=>({...f,rainfall:e.target.value.replace(/[^\d.]/g,'')}))} placeholder="Rainfall" />
-              <input className="border rounded px-2 py-1" value={editForm.humidity} onChange={e=>setEditForm(f=>({...f,humidity:e.target.value.replace(/[^\d.]/g,'')}))} placeholder="Humidity" />
+              <input className="border rounded px-2 py-1" value={editForm.N} onChange={e=>setEditForm(f=>({...f,N:e.target.value.replace(/[^\d.]/g,'')}))} onKeyDown={handleBlockSpaceEnter} placeholder="N" />
+              <input className="border rounded px-2 py-1" value={editForm.P} onChange={e=>setEditForm(f=>({...f,P:e.target.value.replace(/[^\d.]/g,'')}))} onKeyDown={handleBlockSpaceEnter} placeholder="P" />
+              <input className="border rounded px-2 py-1" value={editForm.K} onChange={e=>setEditForm(f=>({...f,K:e.target.value.replace(/[^\d.]/g,'')}))} onKeyDown={handleBlockSpaceEnter} placeholder="K" />
+              <input className="border rounded px-2 py-1" value={editForm.rainfall} onChange={e=>setEditForm(f=>({...f,rainfall:e.target.value.replace(/[^\d.]/g,'')}))} onKeyDown={handleBlockSpaceEnter} placeholder="Rainfall" />
+              <input className="border rounded px-2 py-1" value={editForm.humidity} onChange={e=>setEditForm(f=>({...f,humidity:e.target.value.replace(/[^\d.]/g,'')}))} onKeyDown={handleBlockSpaceEnter} placeholder="Humidity" />
             </div>
             <div className="mt-2 space-x-2">
               <button className="px-3 py-1 text-xs border rounded" onClick={()=>setEditingSoilId(null)}>Cancel</button>

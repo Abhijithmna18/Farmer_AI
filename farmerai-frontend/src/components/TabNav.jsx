@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import ThemeToggle from "./ThemeToggle";
-import { Home, Sprout, BarChart2, User, Settings, MessageSquare, MessageCircle, Warehouse, Calendar, Activity, Video, Brain, Target, Leaf, Droplets, TrendingUp, Shield } from "lucide-react";
+import { Home, Sprout, BarChart2, User, Settings, MessageSquare, MessageCircle, Warehouse, Calendar, Activity, Video, Brain, Target, Leaf } from "lucide-react";
 
 export default function TabNav({ isOpen, onToggle }) {
 	const authContext = useAuth();
@@ -38,10 +38,7 @@ export default function TabNav({ isOpen, onToggle }) {
 	const mlMenu = [
 		{ label: "AI Insights", to: "/ml/insights", Icon: Brain },
 		{ label: "Yield Prediction", to: "/ml/yield", Icon: Target },
-		{ label: "Fertilizer Recommendation", to: "/ml/fertilizer", Icon: Leaf },
-		{ label: "Irrigation AI", to: "/ml/irrigation", Icon: Droplets },
-		{ label: "Price Prediction", to: "/ml/pricing", Icon: TrendingUp },
-		{ label: "Health Monitor", to: "/ml/health", Icon: Shield }
+		{ label: "Fertilizer Recommendation", to: "/ml/fertilizer", Icon: Leaf }
 	];
 
 	// Admin menu items
